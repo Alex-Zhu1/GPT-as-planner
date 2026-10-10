@@ -47,6 +47,11 @@ The build verifies the preserved shared runtime and produces a self-contained `d
 
 ## Run a new evaluation
 
+For the separate, opt-in **pi05 + asynchronous Valen + failure-triggered Astra
+recovery** experiment, see [Jev monitoring and replan](hybrid_rollout/robodojo/jev/README.md).
+It reuses the RoboDojo EEF controller without changing the original evaluation
+entry points. This new variant has no reproduced model/GPU results yet.
+
 The integrations depend on externally installed simulator and policy environments. They are **not** a standalone simulator distribution. RoboDojo uses Isaac Sim 5.1, the matching RoboDojo source/assets and its π₀.₅ OpenPI/JAX checkpoint. RoboLab has its own environment. Obtain these from their upstream projects under their own terms. See `hybrid_rollout/robodojo/SOURCE.json` for the recorded upstream revisions and checkpoint identity.
 
 1. Prepare your simulator environment, OpenPI/JAX environment, checkpoint and Codex CLI. Keep these separate from the lightweight tools environment.

@@ -1,0 +1,9 @@
+# Run from the repository root. CPU controller only, not the GPU model servers.
+name: jev-controller
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - -r requirements-jev.txt

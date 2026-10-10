@@ -2,6 +2,7 @@
 import hashlib
 from pathlib import Path
 import uuid
+import time
 import numpy as np
 from PIL import Image
 
@@ -78,6 +79,7 @@ class RoboDojoSession:
         self.obs = dict(**images, states=states, eef_positions=poses[:, :3],
             eef_quaternions_wxyz=poses[:, 3:], instruction=raw['instruction'],
             remaining_steps=max(0, self.metadata['max_episode_steps']-self.step_id))
+        self.observed_at = time.time()
         if record:
             directory = self.episode_dir/'observations'
             directory.mkdir(exist_ok=True)
@@ -203,7 +205,11 @@ class RoboDojoSession:
         self._check_identity(args['episode_id'], args['step_id'])
         data = {k: v for k, v in args.items() if k not in ('episode_id', 'step_id')}
         if op == 'teacher_observation':
-            return self.obs  # Cached exact post-ACK observation; no hidden step/render.
+            return dict(self.obs, captured_at=self.observed_at)  # Cached post-ACK capture time.
+        if op == 'refresh_observation':
+            require(not self.finished, 'Episode finished')
+            self._observe(record=False)  # Fresh sensors, no action or reset.
+            return dict(self.obs, captured_at=self.observed_at)
         if op == 'record_codex_decision':
             return record_decision(self, args)
         if op == 'begin_combination':

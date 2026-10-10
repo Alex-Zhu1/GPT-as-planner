@@ -127,9 +127,9 @@ class RoboDojoTools:
     def _rpc(self, op, **kwargs):
         return self.sim.request(op, episode_id=self.episode, step_id=self.tick, **kwargs)
 
-    def _observation(self, directory, *, result=None):
+    def _observation(self, directory, *, result=None, refresh=False):
         directory.mkdir(parents=True)
-        self.obs = self._rpc('teacher_observation')
+        self.obs = self._rpc('refresh_observation' if refresh else 'teacher_observation')
         np.savez_compressed(directory/'observation.npz', **{
             k: self.obs[k] for k in self.observation_keys})
         images = []
@@ -139,6 +139,7 @@ class RoboDojoTools:
             images.append(dict(camera=camera, path=str(path)))
         self.observation_path = directory/'observation.json'
         packet = dict(episode_id=self.episode, step_id=self.tick, task=self.task,
+            observation_id=uuid.uuid4().hex, captured_at=self.obs.get('captured_at', time.time()),
             max_episode_steps=self.meta['max_episode_steps'],
             instruction=self.obs['instruction'], remaining_steps=self.obs['remaining_steps'],
             require_native_termination=self.require_native_termination,
@@ -204,9 +205,13 @@ class RoboDojoTools:
     def infer(self, **arguments):
         directory = self._check('pi05_infer', arguments)
         directory.mkdir(parents=True)
-        decision = len(self.history)
         self.proposal_path = directory/'actions.npz'
         self.actions, self.prediction = self.student.infer(self.obs, self.proposal_path)
+        return self._inference_packet(directory)
+
+    def _inference_packet(self, directory, *, student_instruction=None):
+        """Finalize an inference on the simulator owner, including its FK RPC."""
+        decision = len(self.history)
         # Preserve the colleague's downstream audit file layout without copying arrays.
         (self.output/f'proposal_{decision:03d}.npz').hardlink_to(self.proposal_path)
         self.counters['predictions'] += 1
@@ -214,6 +219,7 @@ class RoboDojoTools:
         self.request = dict(request_id=uuid.uuid4().hex, episode_id=self.episode,
             step_id=self.tick, decision=decision, gate_policy='failure-or-intent',
             gate_instruction=GATE_INSTRUCTION, task=self.task, instruction=self.obs['instruction'],
+            student_instruction=student_instruction or self.obs['instruction'],
             sim_time_s=self.tick*self.meta['control_dt'],
             max_episode_steps=self.meta['max_episode_steps'],
             remaining_steps=self.obs['remaining_steps'],

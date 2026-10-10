@@ -1,0 +1,33 @@
+{
+  "startup_timeout": 900,
+  "ports": [8001, 18830, 19113],
+  "services": [
+    {
+      "name": "valen",
+      "argv": ["/opt/conda/envs/valen/bin/python", "/srv/valen/REPLACE_WITH_REAL_SERVER.py"],
+      "cwd": "/srv/valen",
+      "env": {"CUDA_VISIBLE_DEVICES": "2"},
+      "ready_text": "REPLACE_WITH_VALEN_MODEL_AND_HTTP_READY_LOG"
+    },
+    {
+      "name": "pi05",
+      "argv": ["/opt/conda/envs/openpi/bin/python", "-m", "hybrid_rollout.robodojo.pi05_server.server", "--checkpoint", "/srv/checkpoints/pi05", "--port", "18830", "--identity-output", "{run}/pi05-identity.json"],
+      "cwd": "{repo}",
+      "env": {"CUDA_VISIBLE_DEVICES": "1", "XLA_PYTHON_CLIENT_PREALLOCATE": "false"},
+      "ready_text": "\"event\": \"loaded\""
+    },
+    {
+      "name": "simulator",
+      "argv": ["/opt/conda/envs/robodojo/bin/python", "-m", "hybrid_rollout.robodojo.robodojo_server.server", "--task", "arrange_largest_number", "--output", "{run}/sim", "--port", "19113"],
+      "cwd": "/srv/RoboDojo",
+      "env": {"CUDA_VISIBLE_DEVICES": "0", "PYTHONPATH": "/srv/RoboDojo"},
+      "ready_text": "\"event\": \"ready\""
+    }
+  ],
+  "controller": {
+    "name": "controller",
+    "argv": ["/opt/conda/envs/jev-controller/bin/python", "-m", "hybrid_rollout.robodojo.jev.run", "--output", "{run}/controller", "--task", "arrange_largest_number", "--checkpoint", "/srv/checkpoints/pi05", "--sim-port", "19113", "--student-port", "18830", "--valen-url", "http://127.0.0.1:8001/predict", "--codex", "/absolute/path/to/codex", "--chunk-steps", "1", "--max-decisions", "10", "--max-replans", "3", "--max-observation-refreshes", "1"],
+    "cwd": "{repo}",
+    "env": {}
+  }
+}

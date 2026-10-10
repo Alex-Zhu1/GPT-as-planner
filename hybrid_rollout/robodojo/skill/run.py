@@ -132,7 +132,7 @@ def content_items(packet, *, images, max_image_edge=DEFAULT_CODEX_IMAGE_MAX_EDGE
 
 class CodexPolicy:
     def __init__(self, workspace, codex, *, timeout=900, transport_factory=StdioAppServer,
-                 method='pi05_plus_gpt'):
+                 method='pi05_plus_gpt', recovery_schema=None):
         self.method = evaluation_method(method)
         direct = self.method == 'gpt_only'
         skill_root = SKILL_ROOT.parent/'robodojo-gpt-only-rollout' if direct else SKILL_ROOT
@@ -154,12 +154,25 @@ class CodexPolicy:
                        + '\n\n' + context + '\n\nAgent working directory: '
                        + str(self.agent_workspace)
                        + '\nResolve context/ and workspace.json relative to that directory.\n')
+        if recovery_schema is not None:
+            self.prompt += ('\nJev decision-only recovery variant: the host owns execution. '
+                'The decision tool may also record mode=replan with declarative subgoals. '
+                'For this variant only, validated subgoal instructions replace the student prompt '
+                'while the original task remains the final objective. Native EEF bounds and '
+                'the outcome/intent takeover gate for edit/eef are unchanged.\n')
         self.prompt_sha256 = hashlib.sha256(self.prompt.encode()).hexdigest()
         (self.workspace/'SKILL.md').write_text(skill)
         if not direct:
             (self.workspace/'gate_prompt.md').write_text(gate)
         (self.workspace/'PROMPT.md').write_text(self.prompt)
         specs = tool_specs(self.method)
+        if recovery_schema is not None:
+            if direct:
+                raise ValueError('Recovery schema is only supported by the hybrid decision tool')
+            for spec in specs:
+                if spec['name'] == 'robodojo_execute':
+                    spec['inputSchema']['properties']['response'] = recovery_schema
+                    spec['description'] = 'Record one recovery decision or declarative replan. No physics execution.'
         write_json(self.workspace/'tools.json', specs)
         version = subprocess.run([codex, '--version'], capture_output=True, text=True, check=True).stdout.strip()
         config = agent_config(self.workspace, self.agent_workspace)
@@ -237,8 +250,8 @@ class CodexPolicy:
             old_turn_id=old_turn, turn_id=new_turn, step_id=rollout.tick)), flush=True)
         return new_turn
 
-    def run(self, rollout):
-        turn_id = self._turn('Act as the autonomous policy agent for this single simulation rollout. '
+    def run(self, rollout, *, initial_prompt=None):
+        turn_id = self._turn(initial_prompt or 'Act as the autonomous policy agent for this single simulation rollout. '
             'Use your normal file, image, shell/code and planning tools as useful, alongside '
             'the rollout service tools. Read workspace.json for paths and interpreter; '
             'keep working notes and analysis in your agent workspace. Use English for every '

@@ -18,6 +18,7 @@ def decision_event(*, episode_id, step_id, decision, prediction_id, response,
         request_id=response['request_id'], mode=mode, reason=response['reason'],
         requested_steps=response['steps'],
         evaluation_method=response.get('evaluation_method', 'pi05_plus_gpt'),
+        decision_author=response.get('decision_author', 'codex'),
         codex_override=mode in ('edit', 'eef') and response.get('evaluation_method') != 'gpt_only',
         prefix_only=mode == 'student' and response['steps'] < 50,
         numeric_action_changed=None, response=response)

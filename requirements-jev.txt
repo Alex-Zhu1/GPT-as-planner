@@ -1,0 +1,10 @@
+# Controller + focused offline tests. Compatible ranges, not a resolved lockfile.
+# Install openpi-client separately from the SAME checkout as the pi05 server.
+# Do not install this file into an existing Isaac/OpenPI/Valen environment.
+numpy>=1.26.4,<2.0
+scipy>=1.11.4,<1.16
+Pillow>=10.4,<13
+imageio>=2.34,<3
+imageio-ffmpeg>=0.5,<0.7
+msgpack>=1.0.5,<2
+pytest>=8,<10
