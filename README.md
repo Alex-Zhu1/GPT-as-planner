@@ -14,6 +14,7 @@ We evaluate GPT 6 Astra Direct and a hybrid policy that reviews and optionally c
 hybrid_rollout/
   robodojo/               simulator, policy server, controller, skills and scheduler
   robolab/                separate RoboLab integration
+  libero/                 MuJoCo/Pi 0.5 LIBERO + Valen monitoring and HTTP recovery
   report_site/            bilingual report source, gallery and packaging tools
   assets/                 licensed visualization fonts
 report_web/               prebuilt report and its 21 article clips
@@ -46,6 +47,12 @@ npm run build
 The build verifies the preserved shared runtime and produces a self-contained `dist/index.html`. Copy that file to `report_web/index.html`, keeping `data.json`, `scores.csv`, `citation.bib`, licenses and media alongside it. The public authoring snapshot is included; no private experiment storage is needed for this rebuild. Full gallery media are in the separate website repository. Do not run `build.py` merely to rebuild the frontend: that offline evidence-extraction utility requires the original, non-public trajectory archives.
 
 ## Run a new evaluation
+
+For the new **LIBERO + MuJoCo + pi05_libero + Valen** integration, see
+[LIBERO setup and recovery contract](hybrid_rollout/libero/README.md). It uses
+single-arm LIBERO observations/actions and a separate LIBERO checkpoint, with an
+explicit HTTP recovery Planner. CPU tests cover the adapter and scheduler;
+end-to-end LIBERO rendering/GPU task success has not yet been validated.
 
 For the separate, opt-in **pi05 + asynchronous Valen + failure-triggered Astra
 recovery** experiment, see [Jev monitoring and replan](hybrid_rollout/robodojo/jev/README.md).

@@ -1,0 +1,26 @@
+{
+  "startup_timeout": 1800,
+  "ports": [8001, 18830],
+  "services": [
+    {
+      "name": "valen",
+      "argv": ["/opt/conda/envs/valen/bin/python", "-m", "hybrid_rollout.libero.valen_server", "--model", "/srv/models/Valen-2B", "--port", "8001"],
+      "cwd": "{repo}",
+      "env": {"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"},
+      "ready_text": "VALEN_MODEL_AND_HTTP_READY"
+    },
+    {
+      "name": "pi05",
+      "argv": ["/opt/conda/envs/openpi/bin/python", "-m", "hybrid_rollout.libero.pi05_server", "--checkpoint", "/srv/models/pi05_libero", "--port", "18830", "--identity-output", "{run}/pi05-identity.json"],
+      "cwd": "{repo}",
+      "env": {"CUDA_VISIBLE_DEVICES": "0", "XLA_PYTHON_CLIENT_PREALLOCATE": "false", "OPENPI_DATA_HOME": "/srv/cache/openpi"},
+      "ready_text": "\"event\": \"loaded\""
+    }
+  ],
+  "controller": {
+    "name": "controller",
+    "argv": ["/opt/conda/envs/jev-libero/bin/python", "-m", "hybrid_rollout.libero.run", "--libero-root", "/srv/LIBERO", "--checkpoint", "/srv/models/pi05_libero", "--output", "{run}/controller", "--suite", "libero_spatial", "--task-id", "0", "--initial-state-id", "0", "--student-port", "18830", "--valen-url", "http://127.0.0.1:8001/predict", "--planner-url", "http://127.0.0.1:8003/replan", "--chunk-steps", "1", "--max-decisions", "10", "--max-replans", "3", "--gl", "osmesa"],
+    "cwd": "{repo}",
+    "env": {}
+  }
+}

@@ -231,11 +231,12 @@ class ReplanScheduler:
             previous_attempts=deepcopy(self.attempts), native_request=deepcopy(self.rollout.request),
             proposal_path=proposal['proposal_path'], max_chunk_steps=self.chunk_steps,
             monitor_program=dict(config=asdict(self.monitor.config), program_id=self.monitor.config.program_id),
-            contract='Return exactly the echoed identity and request_id plus decision. Decision uses the '
+            contract=getattr(self.rollout, 'recovery_contract',
+                     'Return exactly the echoed identity and request_id plus decision. Decision uses the '
                      'student/edit/eef/stop contract, or mode=replan with reason and 1-8 declarative '
                      'subgoals (subgoal_id, instruction, success_condition), and native_request.request_id. '
                      'Do not change monitoring limits, original task, or execute code as a plan. '
-                     'A local correction is not original-task completion.')
+                     'A local correction is not original-task completion.'))
         self.replans += 1
         self.rollout.run['teacher_off'] = False
         write_json(self.rollout.output/'run.json', self.rollout.run)

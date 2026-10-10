@@ -1,0 +1,21 @@
+# Python 3.10 simulator/controller recipe. Not a validated deployment lock.
+# LIBERO source/assets and openpi-client are installed separately; see its README.
+numpy>=1.23.5,<2
+scipy>=1.10,<1.16
+Pillow>=10.4,<13
+imageio>=2.34,<3
+imageio-ffmpeg>=0.5,<0.7
+msgpack>=1.0.5,<2
+typing_extensions>=4.8
+pytest>=8,<10
+torch==2.2.2
+robosuite==1.4.1
+mujoco==2.3.7
+robomimic==0.2.0
+bddl==1.0.1
+gym==0.25.2
+easydict>=1.9,<2
+cloudpickle>=2.1,<4
+PyYAML>=6,<7
+opencv-python>=4.6,<4.12
+matplotlib>=3.5,<3.9

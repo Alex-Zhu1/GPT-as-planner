@@ -83,9 +83,13 @@ class JSONEndpoint:
 
 
 class ValenMonitor(JSONEndpoint):
+    def __init__(self, url, timeout_s, *, scope='RoboDojo post-action monitoring'):
+        super().__init__(url, timeout_s)
+        self.scope = scope
+
     def evaluate(self, frames):
         # Frames are allowlisted public observations, not simulator outcome packets.
-        content = [{'type': 'text', 'text': json.dumps({'scope': 'RoboDojo post-action monitoring',
+        content = [{'type': 'text', 'text': json.dumps({'scope': self.scope,
                     'frames': frames}, allow_nan=False)}]
         for frame in frames:
             for image in frame['images']:
