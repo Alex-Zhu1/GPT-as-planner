@@ -23,6 +23,7 @@ python -m pip check
 python -c 'from openpi_client.websocket_client_policy import WebsocketClientPolicy; from hybrid_rollout.robodojo.robodojo_server.client import RoboDojoTools; from hybrid_rollout.robodojo.jev.planner import CodexPlanner; print("Controller imports OK")'
 python -m hybrid_rollout.robodojo.jev.run --help
 python -m pytest hybrid_rollout/robodojo/test_jev.py hybrid_rollout/robodojo/test_contract.py -q
+python -m pytest hybrid_rollout/robodojo/test_subgoals.py hybrid_rollout/robodojo/test_subgoal_backends.py -q
 ```
 
 Alternatively, create Python 3.11 with Conda and run
@@ -141,12 +142,14 @@ python -m hybrid_rollout.robodojo.jev.run \
   --sim-port 19113 --student-port 18830 \
   --valen-url http://127.0.0.1:8001/predict \
   --codex /absolute/path/to/codex \
-  --chunk-steps 1 --max-decisions 10 --max-replans 3 \
-  --max-observation-refreshes 1
+  --monitor-policy subgoals --chunk-steps 25 --max-decisions 0 --max-replans 12
 ```
 
 Replace `--codex ...` with `--planner-url http://127.0.0.1:8003/replan` when using
-your external Planner. Model calls may incur charges.
+your external Planner implementing the version-4 subgoal-plan envelope. The Valen
+server must support choice questions and return every candidate probability.
+Use `--monitor-policy temporal` for the previous background-recovery protocol.
+Model calls may incur charges.
 
 The simulator and pi05 clients connect to loopback. For the first deployment,
 run them on the same host with reachable ports. Valen must see image files at

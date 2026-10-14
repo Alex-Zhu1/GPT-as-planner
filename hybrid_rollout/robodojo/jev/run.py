@@ -1,4 +1,4 @@
-"""pi05 + asynchronous Valen accumulation + event-triggered Astra review."""
+"""Astra language plans, Pi subgoal execution and Valen endpoint monitoring."""
 import argparse
 import json
 from pathlib import Path
@@ -20,9 +20,9 @@ def main(argv=None):
     parser.add_argument('--sim-port', type=int, default=19113)
     parser.add_argument('--student-port', type=int, default=18830)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--max-decisions', type=int, default=180)
-    parser.add_argument('--max-replans', type=int, help='0: no call-count cap; default 0 for accumulating, 3 for legacy')
-    parser.add_argument('--monitor-policy', choices=('temporal', 'accumulating', 'legacy'), default='temporal')
+    parser.add_argument('--max-decisions', type=int, help='0: native episode termination; default 0 for subgoals, 180 for older policies')
+    parser.add_argument('--max-replans', type=int, help='Includes initial plan; default 12 for subgoals, 0 for temporal/accumulating, 3 for legacy; 0 disables cap')
+    parser.add_argument('--monitor-policy', choices=('subgoals', 'temporal', 'accumulating', 'legacy'), default='subgoals')
     parser.add_argument('--evidence-decay', type=float)
     parser.add_argument('--evidence-baseline', type=float)
     parser.add_argument('--evidence-threshold', type=float)
@@ -40,6 +40,10 @@ def main(argv=None):
     parser.add_argument('--uncertainty-seconds', type=float, default=6.)
     parser.add_argument('--review-cooldown-seconds', type=float, default=4.)
     parser.add_argument('--max-async-seconds', type=float, default=6.)
+    parser.add_argument('--subgoal-review-seconds', type=float, default=12.,
+                        help='Subgoals: simulated seconds between low-frequency Astra completion reviews')
+    parser.add_argument('--subgoal-review-cooldown-seconds', type=float, default=6.,
+                        help='Minimum simulated seconds between non-urgent anomaly reviews')
     parser.add_argument('--planner-backend', choices=('compact', 'agent', 'api'),
                         help='compact/agent use --codex; api uses independent image model requests')
     parser.add_argument('--api-base-url', help='Model API base URL; default http://127.0.0.1:8317/v1')
@@ -60,8 +64,20 @@ def main(argv=None):
         if not (args.codex or args.planner_url):
             parser.error('Choose --codex, --planner-url, or --planner-backend api')
     temporal = args.monitor_policy == 'temporal'
-    args.chunk_steps = args.chunk_steps if args.chunk_steps is not None else (25 if temporal else 1)
-    args.history = args.history if args.history is not None else (6 if temporal else 2)
+    subgoals = args.monitor_policy == 'subgoals'
+    if args.max_decisions is None:
+        args.max_decisions = 0 if subgoals else 180
+    args.chunk_steps = args.chunk_steps if args.chunk_steps is not None else (25 if temporal or subgoals else 1)
+    args.history = args.history if args.history is not None else (6 if temporal or subgoals else 2)
+    if subgoals and (args.astra_action_chunk != 'sampled' or args.astra_action_steps != 5 or args.astra_output_format != 'full'):
+        parser.error('Subgoal planners return language plans; action-input/output options require an explicit older monitor policy')
+    if subgoals and (any(getattr(args, name) is not None for name in ('evidence_decay', 'evidence_baseline', 'evidence_threshold'))
+                    or args.min_observations != 3 or args.uncertainty_observations != 12
+                    or args.review_cooldown_seconds != 4. or args.max_async_seconds != 6.
+                    or args.max_observation_refreshes != 1):
+        parser.error('Accumulation/background/refresh options require an older monitor policy; use subgoal time budgets')
+    if not subgoals and (args.subgoal_review_seconds != 12. or args.subgoal_review_cooldown_seconds != 6.):
+        parser.error('Subgoal review intervals require --monitor-policy subgoals')
     for key, value in dict(evidence_decay=.85 if temporal else .9,
                           evidence_baseline=.5 if temporal else .2,
                           evidence_threshold=.6 if temporal else 1.5).items():
@@ -73,7 +89,14 @@ def main(argv=None):
     scheduler_class = ReplanScheduler
     from .monitor import ConstraintRuntime
     runtime_factory = ConstraintRuntime
-    if args.monitor_policy in ('temporal', 'accumulating'):
+    if subgoals:
+        from .subgoal_monitor import SubgoalMonitorConfig, SubgoalRuntime, SubgoalValenMonitor
+        from .subgoals import SubgoalScheduler
+        config = SubgoalMonitorConfig(**values, min_evidence_seconds=args.min_evidence_seconds,
+            uncertainty_seconds=args.uncertainty_seconds, review_seconds=args.subgoal_review_seconds,
+            review_cooldown_seconds=args.subgoal_review_cooldown_seconds)
+        runtime_factory, scheduler_class = SubgoalRuntime, SubgoalScheduler
+    elif args.monitor_policy in ('temporal', 'accumulating'):
         from .accumulation import AccumulationConfig, AccumulatingRuntime, AccumulatingScheduler
         config_class, extra = AccumulationConfig, {}
         runtime_factory, scheduler_class = AccumulatingRuntime, AccumulatingScheduler
@@ -86,18 +109,19 @@ def main(argv=None):
             min_observations=args.min_observations, uncertainty_observations=args.uncertainty_observations)
     else:
         config = MonitorConfig(**values)
-    monitor = AsyncMonitor(ValenMonitor(args.valen_url, args.monitor_timeout), config, args.monitor_timeout,
+    monitor_class = SubgoalValenMonitor if subgoals else ValenMonitor
+    monitor = AsyncMonitor(monitor_class(args.valen_url, args.monitor_timeout), config, args.monitor_timeout,
                            runtime_factory=runtime_factory)
     output = args.output.resolve()
     planner_class = CodexPlanner
     planner_options = {}
-    if args.planner_backend in ('compact', 'api') or (args.planner_backend is None and temporal):
+    if args.planner_backend in ('compact', 'api') or (args.planner_backend is None and (temporal or subgoals)):
         from .compact_planner import CompactCodexPlanner
         planner_class = CompactCodexPlanner
         planner_options = dict(action_chunk_mode=args.astra_action_chunk, action_chunk_steps=args.astra_action_steps,
                                output_format=args.astra_output_format)
-    elif temporal:
-        parser.error('Temporal background review requires the compact or api planner backend')
+    elif temporal or subgoals:
+        parser.error('Temporal/subgoal planning requires the compact or api planner backend, or an HTTP planner')
     if (args.astra_action_chunk != 'sampled' or args.astra_action_steps != 5 or args.astra_output_format != 'full') and (
             not planner_options or (not args.codex and args.planner_backend != 'api')):
         parser.error('Astra action chunk options require the local compact or api planner backend')
@@ -110,7 +134,7 @@ def main(argv=None):
         planner = (planner_class(output, args.codex, args.planner_timeout, **planner_options) if args.codex else
                    HTTPPlanner(args.planner_url, args.planner_timeout))
         selected_backend = ('compact' if planner_options else 'agent') if args.codex else 'http'
-    max_replans = args.max_replans if args.max_replans is not None else (3 if args.monitor_policy == 'legacy' else 0)
+    max_replans = args.max_replans if args.max_replans is not None else (12 if subgoals else 3 if args.monitor_policy == 'legacy' else 0)
     scheduler_options = dict(review_cooldown_seconds=args.review_cooldown_seconds,
                              max_async_seconds=args.max_async_seconds) if temporal else {}
     scheduler = scheduler_class(None, monitor, planner, chunk_steps=args.chunk_steps,
@@ -124,13 +148,15 @@ def main(argv=None):
     from ..io import write_json
     write_json(output/'planner_backend.json', dict(backend=selected_backend,
         api_base_url=planner.base_url if selected_backend == 'api' else None,
-        planner_url=args.planner_url, options=planner_options if selected_backend != 'http' else {}))
+        planner_url=args.planner_url, monitor_policy=args.monitor_policy,
+        protocol_version=4 if subgoals else None,
+        options={} if subgoals or selected_backend == 'http' else planner_options))
     student = rollout = None
     try:
         student = Pi05Client(args.student_port, args.checkpoint)
         rollout = RoboDojoTools(output, args.task, student, sim_port=args.sim_port,
                                seed=args.seed, max_decisions=args.max_decisions,
-                               student_step_limit=args.chunk_steps if temporal else 15)
+                               student_step_limit=args.chunk_steps if temporal or subgoals else 15)
         scheduler.rollout = rollout
         with (output/'jev_events.jsonl').open('x') as stream:
             def emit(event):
@@ -145,7 +171,7 @@ def main(argv=None):
             planner.close()
         if rollout is not None:
             rollout.close()
-        if student is not None:
+        if student is not None and not (scheduler.inference and scheduler.inference.call.thread.is_alive()):
             student.close()
 
 

@@ -138,7 +138,7 @@ def cli_args(tmp_path):
 
 
 @pytest.mark.parametrize('flags,expected', [
-    (['--planner-backend', 'api', '--astra-action-chunk', 'recent', '--astra-action-steps', '3'], 'api'),
+    (['--planner-backend', 'api', '--monitor-policy', 'temporal', '--astra-action-chunk', 'recent', '--astra-action-steps', '3'], 'api'),
     (['--codex', '/fake/codex'], 'compact'),
     (['--codex', '/fake/codex', '--planner-backend', 'compact'], 'compact'),
     (['--codex', '/fake/codex', '--monitor-policy', 'legacy'], 'agent'),

@@ -19,3 +19,5 @@ auth.json
 !.env.example
 *.log
 .DS_Store
+.datasets/
+datasets/

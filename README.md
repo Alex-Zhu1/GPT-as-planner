@@ -54,8 +54,10 @@ single-arm LIBERO observations/actions and a separate LIBERO checkpoint, with an
 explicit HTTP recovery Planner. CPU tests cover the adapter and scheduler;
 end-to-end LIBERO rendering/GPU task success has not yet been validated.
 
-For the separate, opt-in **pi05 + asynchronous Valen + failure-triggered Astra
-recovery** experiment, see [Jev monitoring and replan](hybrid_rollout/robodojo/jev/README.md).
+For the separate, opt-in **Astra planning and completion review + pi05 execution + Valen
+anomaly detection** experiment, see [Jev subgoal planning](hybrid_rollout/robodojo/jev/README.md).
+Its controller defaults to a plan of at most three ordered stages; the previous
+background-recovery route remains available with `--monitor-policy temporal`.
 It reuses the RoboDojo EEF controller without changing the original evaluation
 entry points. This new variant has no reproduced model/GPU results yet.
 

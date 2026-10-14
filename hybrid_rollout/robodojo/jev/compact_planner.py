@@ -11,6 +11,8 @@ from ..skill.transport import StdioAppServer
 from .monitor import IDENTITY
 from .plans import recovery_response_schema
 from .task_instructions import constrain_replan_schema, replan_candidates, validate_replan
+from .subgoal_plan import (is_subgoal_request, planning_packet, planning_instructions,
+                           validate_planning_payload)
 
 
 def advisory_schema():
@@ -57,6 +59,8 @@ def validate_action_chunk_options(mode, steps):
 def compact_packet(request, *, action_chunk_mode='sampled', action_chunk_steps=5):
     """Bound image/history volume explicitly; full source remains in the audit."""
     validate_action_chunk_options(action_chunk_mode, action_chunk_steps)
+    if is_subgoal_request(request):
+        return planning_packet(request)
     scene = request['current_scene']
     frames = list(request.get('evidence_frames', []))
     frames = [f for f in frames if f['observation_id'] != scene['observation_id']] + [scene]
@@ -101,6 +105,8 @@ def compact_packet(request, *, action_chunk_mode='sampled', action_chunk_steps=5
 
 def compact_instructions(request, *, action_chunk_mode='sampled', output_format='full'):
     """Shared explicit task instructions and output schema for both transports."""
+    if is_subgoal_request(request):
+        return planning_instructions(request)
     background = request.get('review_kind') == 'background'
     instructions = (
         'You are the RoboDojo visual evidence reviewer. Return only the requested JSON; do not use tools, '
@@ -201,6 +207,8 @@ class CompactCodexPlanner:
         background = request.get('review_kind') == 'background'
         instructions, schema = compact_instructions(request, action_chunk_mode=self.action_chunk_mode,
                                                      output_format=self.output_format)
+        write_json(directory/'schema.json', schema)
+        (directory/'instructions.txt').write_text(instructions)
         prepared = time.monotonic()
         transport = self.connect()
         connected = time.monotonic()
@@ -247,17 +255,23 @@ class CompactCodexPlanner:
                     raise RuntimeError('Astra structured turn failed: '+str(p['turn'].get('error')))
                 break
         decision = json.loads(final) if final else None
-        if not background and isinstance(decision, dict):
+        if is_subgoal_request(request):
+            decision = validate_planning_payload(decision, request)
+        elif not background and isinstance(decision, dict):
             decision = decision.get('decision')
             validate_replan(decision, request)
+        if self.closed:
+            raise RuntimeError('Planner closed while request was in flight; discard result')
         response = dict(**{k:request[k] for k in ('request_id',*IDENTITY)},decision=decision)
         write_json(directory/'response.json',response)
         write_json(directory/'timing.json',dict(elapsed_seconds=time.monotonic()-started,
             prompt_characters=len(prompt),attached_images=len(images),model='gpt-6-astra',effort='high',
-            backend='compact',
-            action_chunk_mode=self.action_chunk_mode, action_chunk_steps=self.action_chunk_steps,
+            backend='compact', planner_role=request.get('planner_role'), protocol_version=request.get('version'),
+            action_chunk_mode='none' if is_subgoal_request(request) else self.action_chunk_mode,
+            action_chunk_steps=None if is_subgoal_request(request) else self.action_chunk_steps,
             action_chunk_points=len(packet.get('proposal', {}).get('sampled_fk', [])),
-            output_format=self.output_format, local_prepare_seconds=prepared-prepare_started,
+            output_format='subgoal_plan_v4' if is_subgoal_request(request) else self.output_format,
+            local_prepare_seconds=prepared-prepare_started,
             connect_seconds=connected-prepared, thread_start_seconds=thread_ready-started,
             turn_submit_seconds=turn_ready-thread_ready,
             first_output_seconds=first_output-started if first_output is not None else None,

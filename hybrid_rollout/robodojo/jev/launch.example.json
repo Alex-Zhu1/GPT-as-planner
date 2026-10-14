@@ -26,7 +26,7 @@
   ],
   "controller": {
     "name": "controller",
-    "argv": ["/opt/conda/envs/jev-controller/bin/python", "-m", "hybrid_rollout.robodojo.jev.run", "--output", "{run}/controller", "--task", "arrange_largest_number", "--checkpoint", "/srv/checkpoints/pi05", "--sim-port", "19113", "--student-port", "18830", "--valen-url", "http://127.0.0.1:8001/predict", "--codex", "/absolute/path/to/codex", "--chunk-steps", "1", "--max-decisions", "10", "--max-replans", "3", "--max-observation-refreshes", "1"],
+    "argv": ["/opt/conda/envs/jev-controller/bin/python", "-m", "hybrid_rollout.robodojo.jev.run", "--output", "{run}/controller", "--task", "arrange_largest_number", "--checkpoint", "/srv/checkpoints/pi05", "--sim-port", "19113", "--student-port", "18830", "--valen-url", "http://127.0.0.1:8001/predict", "--codex", "/absolute/path/to/codex", "--monitor-policy", "subgoals", "--chunk-steps", "25", "--max-decisions", "0", "--max-replans", "12"],
     "cwd": "{repo}",
     "env": {}
   }

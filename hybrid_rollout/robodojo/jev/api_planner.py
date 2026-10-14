@@ -12,6 +12,7 @@ from .compact_planner import compact_packet, compact_instructions, recovery_outp
 from .monitor import IDENTITY
 from .plans import validate_decision
 from .task_instructions import validate_replan
+from .subgoal_plan import is_subgoal_request, validate_planning_payload, PLAN_VERSION
 
 MODEL, EFFORT = 'gpt-6-astra', 'high'
 DEFAULT_BASE_URL = 'http://127.0.0.1:8317/v1'
@@ -19,6 +20,8 @@ DEFAULT_KEY_FILE = Path(__file__).resolve().parents[3]/'runtime/local-codex-api/
 
 
 def validated_payload(payload, request):
+    if is_subgoal_request(request):
+        return validate_planning_payload(payload, request)
     if request.get('review_kind') == 'background':
         if (set(payload) != {'mode', 'reason'} or
                 payload['mode'] not in ('continue', 'request_recovery') or
@@ -61,7 +64,7 @@ class CompactAPIPlanner:
     def _replan(self, request):
         started = time.monotonic()
         background = request.get('review_kind') == 'background'
-        if request.get('version') != (2 if background else 1):
+        if request.get('version') != (PLAN_VERSION if is_subgoal_request(request) else 2 if background else 1):
             raise ValueError('Expected RoboDojo version 2 advisory or version 1 recovery')
         identity = {k: request[k] for k in ('request_id', *IDENTITY)}
         packet, images = compact_packet(request, action_chunk_mode=self.action_chunk_mode,
@@ -84,12 +87,14 @@ class CompactAPIPlanner:
         directory = self.output/f'astra_api_{name}'
         directory.mkdir(parents=True)
         timing = dict(backend='api', stateless=True, model=MODEL, effort=EFFORT,
+            planner_role=request.get('planner_role'), protocol_version=request.get('version'),
             api_base_url=self.base_url, status='pending', tools=[],
             prompt_characters=len(prompt), attached_images=len(images), image_sha256=image_hashes,
             instructions_sha256=hashlib.sha256(instructions.encode()).hexdigest(),
-            action_chunk_mode=self.action_chunk_mode, action_chunk_steps=self.action_chunk_steps,
+            action_chunk_mode='none' if is_subgoal_request(request) else self.action_chunk_mode,
+            action_chunk_steps=None if is_subgoal_request(request) else self.action_chunk_steps,
             action_chunk_points=len(packet.get('proposal', {}).get('sampled_fk', [])),
-            output_format=self.output_format)
+            output_format='subgoal_plan_v4' if is_subgoal_request(request) else self.output_format)
         write_json(directory/'request.json', request)
         write_json(directory/'input.json', packet)
         write_json(directory/'images.json', images)

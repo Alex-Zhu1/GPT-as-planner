@@ -1,9 +1,146 @@
-# Asynchronous Valen monitoring and Astra recovery
+# Astra subgoal planning, Pi execution and Valen monitoring
 
 This is an **opt-in experimental RoboDojo entry point**, independent of the
 unchanged `skill.run` full-time Astra reviewer and GPT-only baseline. It uses
 Valen (the multimodal Jev-inspired model), not the text-only TypeSafe Jev API.
 No dependency on the sibling `Jev` checkout is needed.
+
+## Subgoal policy (default)
+
+`jev.run` defaults to `--monitor-policy subgoals`. Astra produces **one to
+three language stages**, Pi executes the active instruction, and Valen detects
+anomalies. **Only Astra assesses completion and authorizes stage transitions.**
+The previous background recovery experiment requires `--monitor-policy temporal`.
+
+```text
+initial observation -> Pi original-task inference (speculative, no execution)
+                    -> Astra initial language plan (in parallel)
+validated plan -> Pi active-stage instruction -> bounded execution
+                    ^                              |
+                    |                       Valen anomaly evidence
+                    +--- no review due ------------+
+                    +--- anomaly or periodic review -> paused Astra assessment
+                                                      | keep current stage
+                                                      | advance completed stage
+                                                      | plan missing/failed work
+native termination -> record success/failure separately from visual completion
+```
+
+The initial Pi proposal is reused only if its instruction exactly matches the
+first stage and the observation has not changed. Otherwise it is discarded.
+Every stage change or review discards unexecuted old proposals. There is one
+simulator owner, one Valen request at a time, and at most one unreviewed executed
+chunk. Pi inference overlaps the preceding Valen report; execution waits for
+that report. Astra reviews use a fresh paused capture without advancing physics.
+They do not reset the episode or produce numerical robot actions.
+
+The host derives requirements from the original instruction and public task
+context. The installed `organize_table` scene has four movable items and a static
+drawer: mouse on pad, keyboard aligned face up in its frame, figurine upright on
+its stand, alarm clock upright on the cabinet, then both arms return. Its source
+instruction's drawer-opening/miscellaneous-storage clause does not apply to this
+scene and is explicitly explained in `task_context`; the original stays in the
+audit. These public semantics contain no per-episode success or object truth.
+Other known task templates preserve their required order; unknown instructions
+remain whole. Placement requirements in this scene may be reordered.
+
+The shared [subgoal_planner.md](subgoal_planner.md) uses a **version-4** schema in
+both API and compact transports. Astra returns `plan` (1–3 replacement goals),
+`keep_plan`, or `advance`. Every review assesses **all** requirements as satisfied,
+pending, or uncertain, with visual evidence. A replacement plan covers exactly
+the unfinished, uncertain, or reopened requirements, each once. Coverage, checks,
+ordering constraints and request identity are validated. Astra can write concise
+RoboDojo-style repair instructions instead of copying original clauses verbatim.
+It can recognize work done outside the current stage and reopen damaged results;
+Valen cannot mark requirements complete or reopen them. Arm return remains last.
+External `--planner-url` services must implement this version-4 envelope.
+The older full-agent skill is not loaded; the model remains `gpt-6-astra/high`.
+No performance gain is assumed without evaluation.
+
+Pi instructions use short action/target/destination descriptions, for example
+`Pick up the fallen figurine and put it upright on the stand.` The host validates
+at most **24 words, 160 characters and one sentence per covered requirement**
+(600 characters total for grouped stages), and rejects common verification or
+preservation appendices such as `ensure ...` or `without disturbing ...`.
+These bounds are a language-interface policy, not an experimentally optimal
+token limit. Stability, support, release and preservation requirements remain
+in the exact completion checks and Astra's visual assessments. Necessary release
+actions are still allowed. Invalid text is rejected before activation, never
+silently truncated; a rejected planner response stops the scheduler as before.
+
+Every review includes the last six activated instruction versions, their covered
+requirements, actual executed control counts and the reasons for changing them.
+When fresh execution evidence shows repeated failed grasps or ineffective
+attempts, Astra should return `plan` with a different short description of the
+same unfinished goal, preserving completion checks and future work. A periodic
+review may do this even when Valen found no anomaly. Normal approach, occlusion
+or elapsed time alone do not justify a rewrite. The existing review cooldown and
+planner-call budget still apply; no automatic synonym cycling is introduced.
+`subgoal_instruction_rewritten` records old/new wording and Astra's reason;
+`instruction_history` in the summary retains execution counts across `keep_plan`.
+
+Valen receives plan context, task requirements, recent three-camera endpoints
+and labeled reference images. Its only questions are:
+
+| Question | Candidates |
+| --- | --- |
+| Observability | usable, occluded, ambiguous |
+| Each independent anomaly | present, clear, insufficient_evidence |
+
+Anomalies are wrong object, bad placement/orientation/support, wrong order,
+collision, grasp failure, regression of an achieved result, and stalled attempts.
+Questions distinguish an unfinished placement from an attempted but bad result.
+There are no completion votes or phase/progress classifiers. Neither model
+receives predicted Pi actions, rewards or simulator object truth.
+
+Scheduling defaults (experimental thresholds, not calibrated probabilities):
+
+- 25 controls per chunk at 0.04 s/control, 6 recent Valen endpoints, threshold 0.8.
+- 3 simulated seconds of the same visible anomaly request Astra review;
+  collision probability >=0.9 requests review immediately on a new detection.
+- 6 simulated seconds of confidently occluded/ambiguous observations request
+  review. Diffuse low-confidence answers alone do not repeatedly trigger Astra.
+- Reviews have a 6-second execution cooldown (`--subgoal-review-cooldown-seconds`).
+  The first anomaly review and a new acute collision bypass it; persistent acute
+  detections do not bypass it repeatedly.
+- Every 12 simulated seconds since the last review, Astra checks progress even
+  without an anomaly (`--subgoal-review-seconds`). This allows completion and
+  stage switching without making Valen a completion judge. A 40-second episode
+  with no anomalies uses four Astra calls including the initial plan.
+- A final visual confirmation retains the last instruction for settling until
+  native termination. Later visual assessments can revoke it. Only native
+  success counts as task success.
+- `--max-replans 12` includes the initial call; zero removes this cap.
+  Exhausted budgets, malformed plans or unavailable models stop incomplete.
+  `--max-decisions 0` uses native termination. Older action-tuning flags require
+  an explicit older monitor policy.
+
+```sh
+python -m hybrid_rollout.robodojo.jev.run \
+  --output /absolute/new/subgoal-run --task organize_table \
+  --checkpoint /absolute/path/to/pi05/checkpoint \
+  --sim-port 19113 --student-port 18830 \
+  --valen-url http://127.0.0.1:8001/predict \
+  --planner-backend api --api-base-url http://127.0.0.1:8317/v1 \
+  --api-key-file /absolute/path/to/local-api-key \
+  --monitor-policy subgoals --chunk-steps 25 --max-replans 12
+```
+
+Alternatively use `--codex /absolute/path/to/codex`. Valen's `/predict` must
+support `choice` questions; malformed or unsupported responses fail closed.
+`jev_plan_*_<goal>.json`, `jev_events.jsonl`, `jev_summary.json` and the planner
+request/input/schema/prompt/response artifacts record the actual activated
+instructions and stage evidence. `result.json` remains the native outcome;
+exit code 0 means a native episode finished, including native task failure.
+
+```sh
+python -m pytest hybrid_rollout/robodojo/test_subgoals.py \
+  hybrid_rollout/robodojo/test_subgoal_backends.py -q
+```
+
+## Temporal policy (explicit comparison)
+
+Select `--monitor-policy temporal` to run this prior protocol:
 
 ```text
 pi05: predict 50 controls -> execute up to 25 -> fresh camera endpoint
@@ -18,8 +155,6 @@ pi05: predict 50 controls -> execute up to 25 -> fresh camera endpoint
                                                     |
                            fresh scene + proposal -> student/edit/EEF/replan
 ```
-
-## Temporal policy (default)
 
 - `--chunk-steps 25` executes a prefix of 25 controls from each 50-step pi05
   prediction. At RoboDojo's 0.04-second control interval this is one simulated
@@ -165,7 +300,7 @@ Automatic student decisions record uncertain intent and
 predictive action assessment. Runs use `evaluation_method=pi05_valen_replan` and
 must be distinguished from published baselines.
 
-## Run
+## Run the temporal comparison
 
 For a paired pure-pi05 control, start only the same simulator and pi05 services,
 then run `python -m hybrid_rollout.robodojo.baseline` with `--output`, `--task`,
