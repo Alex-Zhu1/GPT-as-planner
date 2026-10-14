@@ -1,0 +1,16 @@
+{
+  "records": 12,
+  "groups": 4,
+  "status_counts": {
+    "progressing": 3,
+    "satisfied": 2,
+    "execution_failure": 4,
+    "repeated_no_effect": 2,
+    "insufficient_evidence": 1
+  },
+  "labelled_questions": 34,
+  "unique_input_assets": 180,
+  "source_npz_files": 60,
+  "train_validation_test_split_created": false,
+  "model_called": false
+}

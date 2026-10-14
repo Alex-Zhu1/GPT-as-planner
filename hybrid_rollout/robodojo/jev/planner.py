@@ -55,7 +55,7 @@ class DecisionOnlyRollout:
 
 
 class CodexPlanner:
-    """Invoke the repository's pinned Astra policy only on confirmed failure."""
+    """Invoke Astra for a scheduler-requested evidence or recovery review."""
     def __init__(self, output, codex, timeout=300., policy_factory=None):
         self.output, self.codex, self.timeout = Path(output), codex, timeout
         self.policy_factory = policy_factory
@@ -79,8 +79,14 @@ class CodexPlanner:
             path = directory/'replan_request.json'
             write_json(path, request)
             deferred = DecisionOnlyRollout(request, directory)
+            review = request.get('review_kind', 'confirmed_failure')
+            context = ('The same RoboDojo episode is paused after a confirmed Valen constraint failure. '
+                       if review == 'confirmed_failure' else
+                       'The same RoboDojo episode is paused for an evidence review, not a confirmed failure. '
+                       'Read review_reason and accumulated_evidence when present. Persistent uncertainty '
+                       'alone is not grounds to invent a grasp failure or collision. ')
             worker.run(deferred, initial_prompt=(
-                'The same RoboDojo episode is paused after a confirmed Valen constraint failure. '
+                context +
                 'Act only as the recovery Planner, not the rollout owner. Read the complete request at '
                 f'{path}. Inspect current_scene images/proprio separately from historical failure evidence. '
                 'Use the unchanged outcome/intent gate and EEF geometry contract. '

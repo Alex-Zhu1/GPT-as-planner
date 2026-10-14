@@ -9,7 +9,7 @@ import uuid
 
 from ..io import write_json
 from .monitor import IDENTITY, PendingCall
-from .plans import validate_decision
+from .plans import validate_decision, validate_plan_operation, validate_recovery_decision
 
 
 class AsyncInference:
@@ -69,28 +69,42 @@ def public_frame(rollout, identity, subgoal):
 
 def validate_plan(raw, request, rollout, max_chunk_steps):
     required = {'request_id', *IDENTITY, 'decision'}
+    if request.get('board_review_required'):
+        required.add('board_assessment')
     if not isinstance(raw, dict) or set(raw) != required:
         raise ValueError('Expected a versioned recovery envelope with a decision')
     if any(type(raw[key]) is not type(request[key]) or raw[key] != request[key]
            for key in ('request_id', *IDENTITY)):
         raise ValueError('Stale or unrelated Planner response')
     decision = deepcopy(raw['decision'])
-    validate_decision(decision, rollout.request, max_chunk_steps, rollout.validate)
+    validate_recovery_decision(decision, request, rollout.validate)
+    if request.get('board_review_required'):
+        rollout.validate_board_assessment(raw['board_assessment'], request)
     decision.update(evaluation_method='pi05_valen_replan', decision_author='planner')
     return decision
 
 
 class ReplanScheduler:
+    progress_review_enabled = False
+    max_chunk_steps = 5
+
     def __init__(self, rollout, monitor, planner, *, chunk_steps=1, max_replans=3,
-                 policy_timeout=120., planner_timeout=300., max_observation_refreshes=1, emit=None):
-        if type(chunk_steps) is not int or not 1 <= chunk_steps <= 5:
-            raise ValueError('Monitored chunks must contain 1..5 controls')
+                 policy_timeout=120., planner_timeout=300., max_observation_refreshes=1,
+                 max_uncertainty_reviews=0, include_initial_context=False, uncertainty_policy='pause', emit=None):
+        if uncertainty_policy not in ('pause', 'continue'):
+            raise ValueError('Unknown uncertainty policy')
+        self.uncertainty_policy = uncertainty_policy
+        self.uncertain_continuations = 0
+        if type(chunk_steps) is not int or not 1 <= chunk_steps <= self.max_chunk_steps:
+            raise ValueError(f'Monitored chunks must contain 1..{self.max_chunk_steps} controls')
         if monitor.config.max_step_gap < chunk_steps:
             raise ValueError('Step-gap limit must cover a monitored chunk')
-        if type(max_replans) is not int or max_replans < 1:
-            raise ValueError('Recovery budget must be a positive integer')
+        if type(max_replans) is not int or max_replans < 0:
+            raise ValueError('Recovery budget must be nonnegative; zero uses native termination without a call-count cap')
         if type(max_observation_refreshes) is not int or not 0 <= max_observation_refreshes <= 3:
             raise ValueError('Supplemental observation budget must be an integer in [0, 3]')
+        if type(max_uncertainty_reviews) is not int or not 0 <= max_uncertainty_reviews <= 50:
+            raise ValueError('Uncertainty review budget must be an integer in [0, 50]')
         for timeout in (policy_timeout, planner_timeout, monitor.timeout_s):
             if isinstance(timeout, bool) or not isinstance(timeout, (float, int)) or not math.isfinite(timeout) or timeout <= 0:
                 raise ValueError('Deadlines must be finite and positive')
@@ -100,6 +114,9 @@ class ReplanScheduler:
         self.chunk_steps, self.max_replans = chunk_steps, max_replans
         self.policy_timeout, self.planner_timeout = policy_timeout, planner_timeout
         self.max_observation_refreshes = max_observation_refreshes
+        self.max_uncertainty_reviews = max_uncertainty_reviews
+        self.uncertainty_reviews = 0
+        self.include_initial_context = include_initial_context
         self.emit = emit or (lambda event: None)
         self.run_id, self.revision, self.replans = uuid.uuid4().hex, 0, 0
         self.subgoal_id, self.subgoal = 'original-task', None
@@ -195,6 +212,7 @@ class ReplanScheduler:
         self.verify_recovery = False
         if refresh:
             self.capture_scene()
+        self.seed_context()
         write_json(self.rollout.output/f'jev_plan_{self.revision:03d}.json',
                    dict(**self.identity, original_task=self.original_task, remaining_plan=list(self.goals)))
         self.transition('RUNNING', reason)
@@ -210,26 +228,70 @@ class ReplanScheduler:
         self.event('policy_discarded', reason='High-level replan changes the policy instruction',
                    archive=str(destination))
 
-    def recover(self, failure):
-        self.transition('PAUSED_FOR_REPLAN', 'Confirmed constraint violation')
-        if self.replans >= self.max_replans:
-            self.transition('STOPPED', 'Recovery budget exhausted')
+    def seed_context(self):
+        if self.include_initial_context:
+            frame = self.current_frame()
+            frame['context_only'] = True
+            self.monitor.seed_context(frame)
+            self.frames.append(frame)
+            self.event('initial_context', frame=frame, adds_confirmation_vote=False)
+
+    def progress_review(self, feedback):
+        """Optional domain-specific liveness review; never rewrites Valen scores."""
+        return None
+
+    def recovery_context(self):
+        """Optional deployment timing/budget context; no simulator outcome labels."""
+        return {}
+
+    def validate_recovery_scene(self, scene):
+        self.fresh(scene)
+
+    def poll_background(self, feedback):
+        """Return recovery evidence only when a fresh paused review is needed."""
+        return None
+
+    def recover(self, failure, *, uncertainty=False, progress=False):
+        self.transition('PAUSED_FOR_UNCERTAINTY_REVIEW' if uncertainty else 'PAUSED_FOR_REPLAN',
+                        'Unresolved evidence; no confirmed failure asserted' if uncertainty else
+                        'Evidence or budget rule requests Astra interpretation' if progress else
+                        'Confirmed constraint violation')
+        used, limit = ((self.uncertainty_reviews, self.max_uncertainty_reviews) if uncertainty
+                       else (self.replans, self.max_replans))
+        if (uncertainty or limit) and used >= limit:
+            self.transition('STOPPED', 'Uncertainty review budget exhausted' if uncertainty else
+                            'Recovery budget exhausted')
             return None
         # Drain the only policy call before reusing its stateful connection. No FK
         # or actions from the speculative result are installed, even if it succeeded.
-        self.discard_inference('Confirmed failure; speculative proposal is never installed')
+        self.discard_inference('Paused review requires a fresh scene')
         scene = self.capture_scene()
-        self.start_inference()
-        proposal = self.finish_inference()
-        # This new proposal is grounded in the paused scene, not the discarded one.
-        # Astra may select it, edit it, provide an EEF target, or decline recovery.
+        context = self.recovery_context()
+        instruction_review = context.get('planner_role') == 'instruction_only'
+        if instruction_review:
+            if self.rollout.phase == 'execute':
+                self.retire_prepared_proposal()
+            # A review identity, not a candidate action. Pi runs after the decision.
+            native = dict(request_id=uuid.uuid4().hex, step_id=scene['step_id'],
+                instruction=self.original_task, student_instruction=self.subgoal,
+                robot_profile=self.rollout.observation_packet['robot_profile'],
+                previous_result=deepcopy(self.rollout.history[-1]) if self.rollout.history else None)
+            proposal = None
+        else:
+            if context.get('planner_role') == 'instruction_eef' and self.rollout.phase == 'execute':
+                self.retire_prepared_proposal()
+            self.start_inference()
+            proposal = self.finish_inference()
+            native = deepcopy(self.rollout.request)
+        # Legacy action reviews include a fresh proposal. Instruction reviews
+        # carry only scene evidence and generate Pi controls after the decision.
         request = dict(version=1, request_id=uuid.uuid4().hex, **self.identity,
             original_task=self.rollout.meta['instruction'], current_subgoal=self.subgoal,
             remaining_task=self.rollout.meta['instruction'], current_scene=scene,
             remaining_plan=deepcopy(list(self.goals)),
             failure=failure, confirmation_reports=list(self.reports), evidence_frames=list(self.frames),
-            previous_attempts=deepcopy(self.attempts), native_request=deepcopy(self.rollout.request),
-            proposal_path=proposal['proposal_path'], max_chunk_steps=self.chunk_steps,
+            previous_attempts=deepcopy(self.attempts), native_request=native,
+            max_chunk_steps=self.chunk_steps,
             monitor_program=dict(config=asdict(self.monitor.config), program_id=self.monitor.config.program_id),
             contract=getattr(self.rollout, 'recovery_contract',
                      'Return exactly the echoed identity and request_id plus decision. Decision uses the '
@@ -237,32 +299,109 @@ class ReplanScheduler:
                      'subgoals (subgoal_id, instruction, success_condition), and native_request.request_id. '
                      'Do not change monitoring limits, original task, or execute code as a plan. '
                      'A local correction is not original-task completion.'))
-        self.replans += 1
+        if progress:
+            request['review_kind'] = 'progress'
+            request['contract'] += (' This is a progress review, NOT a confirmed constraint failure. '
+                'Compare the temporal images, assess whether the task is advancing, and choose '
+                'a grounded retry, corrective subgoal plan, bounded edit or stop. Preserve the '
+                'original instruction. A watchdog request is not evidence of collision or task success.')
+        if uncertainty:
+            request['review_kind'] = 'uncertainty'
+            request['contract'] += (' This is an uncertainty review, NOT a confirmed failure. '
+                'Only student with steps=1 or stop is allowed. Approve a single bounded student '
+                'control only when the actual images and fresh proposal justify it; otherwise stop. '
+                'Do not claim Valen cleared the scene. No edit, eef or replan is allowed here.')
+        request.update(context)
+        if proposal is not None:
+            request['proposal_path'] = proposal['proposal_path']
+        if context.get('planner_role') == 'instruction_eef':
+            from ...libero.control_review import diagnostics
+            from ...libero.instruction_planner import review_brief
+            request['control_diagnostics'] = diagnostics(request)
+            request['review_brief'] = review_brief(request)
+        if instruction_review:
+            from ...libero.instruction_planner import review_brief, public_evidence
+            request['review_brief'] = review_brief(request)
+            request = public_evidence(request)
+        if uncertainty:
+            self.uncertainty_reviews += 1
+            name = f'jev_uncertainty_{self.uncertainty_reviews:03d}.json'
+        else:
+            self.replans += 1
+            name = f'jev_replan_{self.replans:03d}.json'
         self.rollout.run['teacher_off'] = False
         write_json(self.rollout.output/'run.json', self.rollout.run)
-        path = self.rollout.output/f'jev_replan_{self.replans:03d}.json'
+        path = self.rollout.output/name
         write_json(path, request)
-        self.event('replan_request', request=request)
+        self.event('uncertainty_review_request' if uncertainty else 'replan_request', request=request)
         self.transition('PLANNING')
         call = PendingCall(lambda: self.planner.replan(deepcopy(request)), self.planner_timeout, 'jev-planner')
-        raw = call.get()
+        try:
+            raw = call.get()
+        except TimeoutError:
+            diagnostics = getattr(self.planner, 'diagnostics', None)
+            self.event('planner_timeout', timeout_seconds=self.planner_timeout,
+                       worker_alive=call.thread.is_alive(), transport=diagnostics() if callable(diagnostics) else {})
+            raise
         self.transition('VALIDATING_PLAN')
         response = validate_plan(raw, request, self.rollout, self.chunk_steps)
-        self.fresh(scene)
+        if uncertainty:
+            if response['mode'] not in ('student', 'stop') or response['steps'] != 1:
+                raise ValueError('Uncertainty review only permits a single student control or stop')
+            if response['mode'] == 'student' and response['assessment']['intent_status'] != 'aligned':
+                raise ValueError('Uncertainty continuation requires an aligned intent assessment')
+            response['decision_author'] = 'uncertainty_reviewer'
+        self.validate_recovery_scene(scene)
         self.attempts.append(dict(request_id=request['request_id'], plan_revision=self.revision,
-                                  failure=failure, decision=response, result='not_executed'))
-        self.event('replan_response', response=raw)
+                                  failure=failure, decision=response, result='not_executed',
+                                  review_kind='uncertainty' if uncertainty else
+                                  'progress' if progress else 'confirmed_failure'))
+        if request.get('board_review_required'):
+            self.attempts[-1]['board_review'] = dict(author='astra', request_id=request['request_id'],
+                source_step=scene['step_id'], source_observation_id=scene['observation_id'],
+                plan_revision=request['plan_revision'], assessment=deepcopy(raw['board_assessment']))
+        self.event('uncertainty_review_response' if uncertainty else 'replan_response', response=raw)
         if response['mode'] == 'stop':
-            self.transition('STOPPED', 'Planner declined recovery')
+            self.transition('STOPPED', 'Planner declined uncertainty continuation' if uncertainty else
+                            'Planner declined recovery')
             return None
-        if response['mode'] == 'replan':
+        if uncertainty:
+            # Do not reset generation, relabel Valen as clear, or claim recovery verified.
+            self.transition('RUNNING', 'Planner authorized one student control under uncertainty')
+            return response
+        if response['mode'] == 'keep_instruction':
+            if not instruction_review:
+                self.retire_prepared_proposal()
+            self.attempts[-1]['result'] = 'instruction_retained_without_execution'
+            self.transition('RUNNING', 'Astra retained the current instruction; fresh Pi inference follows')
+            return response
+        if response['mode'] == 'resume_original':
+            if not instruction_review:
+                self.retire_prepared_proposal()
+            self.goals = deque([dict(subgoal_id='original-task', instruction=self.original_task, success_condition=None)])
+            self.activate_goal('Astra explicitly authorized resuming the original instruction')
+            self.attempts[-1]['result'] = 'original_instruction_restored_without_execution'
+        elif response['mode'] == 'advance_subgoal':
             self.retire_prepared_proposal()
+            completed = self.goals.popleft()
+            self.task_context.completed_subgoal(completed, scene)
+            self.event('subgoal_completed', subgoal=completed, author='astra',
+                       authorization=deepcopy(raw['decision']))
+            self.activate_goal('Astra explicitly authorized the next subgoal')
+            self.attempts[-1]['result'] = 'subgoal_advanced_without_execution'
+        elif response['mode'] == 'replan':
+            if not instruction_review:
+                self.retire_prepared_proposal()
             original = dict(subgoal_id='original-task', instruction=self.original_task, success_condition=None)
-            self.goals = deque([*deepcopy(response['subgoals']), original])
+            self.goals = deque(deepcopy(response['subgoals']) if request.get('recovery_policy') == 'single_instruction'
+                               else [*deepcopy(response['subgoals']), original])
             self.activate_goal('Validated high-level recovery plan installed')
             self.attempts[-1]['result'] = 'plan_installed_without_execution'
         else:
             self.activate_goal('Validated local recovery decision installed', refresh=False)
+        if context.get('planner_role') == 'instruction_eef' and response['mode'] == 'eef':
+            from ...libero.control_review import executable_eef
+            return executable_eef(response, native)
         return response
 
     def run(self):
@@ -276,19 +415,50 @@ class ReplanScheduler:
             self.original_task = self.subgoal
             self.goals.append(dict(subgoal_id='original-task', instruction=self.subgoal, success_condition=None))
             self.rollout.run.update(evaluation_method='pi05_valen_replan', gate_policy='valen-post-action',
-                                   teacher_off=True, teacher_invocation='confirmed_failure_only',
+                                   teacher_off=True, teacher_invocation=(
+                                       'confirmed_failure_or_progress_review' if self.progress_review_enabled else
+                                       'confirmed_failure_or_uncertainty_review' if self.max_uncertainty_reviews and self.uncertainty_policy == 'pause'
+                                       else 'confirmed_failure_only'),
+                                   max_uncertainty_reviews=self.max_uncertainty_reviews,
+                                   uncertainty_policy=self.uncertainty_policy,
                                    predictive_intent_gate=False, monitor_program=asdict(self.monitor.config))
             write_json(self.rollout.output/'run.json', self.rollout.run)
             self.transition('RUNNING')
+            self.seed_context()
             while self.rollout.phase != 'done':
                 # After a Planner action, observe first. Even speculative policy
                 # inference waits for the recovery verification boundary.
                 if not self.verify_recovery:
                     self.start_inference()
                 feedback = None
+                response = None
                 if self.monitor.pending is not None:
                     feedback = self.review()
-                if self.verify_recovery and feedback and not feedback['violations']:
+                background = self.poll_background(feedback)
+                if background:
+                    response = self.recover(background, progress=True)
+                    if response is None:
+                        break
+                    if response['mode'] == 'replan':
+                        continue
+                if response is None and feedback and not feedback['violations']:
+                    advisory = self.progress_review(feedback)
+                    if advisory:
+                        self.event('progress_review_trigger', evidence=advisory)
+                        response = self.recover(advisory, progress=True)
+                        if response is None:
+                            break
+                        if response['mode'] == 'replan':
+                            continue
+                if response is None and self.verify_recovery and feedback and not feedback['violations']:
+                    if (feedback['state'] == 'UNCERTAIN' and self.uncertainty_policy == 'continue'
+                            and self.attempts[-1]['review_kind'] == 'progress'):
+                        # Observe the executed correction without asserting it worked.
+                        self.verify_recovery = False
+                        self.attempts[-1]['verification'] = dict(
+                            observation_id=feedback['observation_id'], result='still_uncertain')
+                        self.event('recovery_observed_uncertain', report=feedback)
+                        continue
                     if feedback['state'] != 'RUNNING':
                         feedback = self.resolve_uncertainty(recovery=True)
                         if feedback is None:
@@ -297,11 +467,25 @@ class ReplanScheduler:
                     self.attempts[-1]['verification'] = dict(observation_id=feedback['observation_id'],
                         result='clear_monitor_checks_not_task_success')
                     self.event('recovery_verified', report=feedback)
-                elif feedback and feedback['state'] == 'UNCERTAIN':
-                    feedback = self.resolve_uncertainty()
-                    if feedback is None:
-                        break
-                if feedback and feedback['violations']:
+                elif response is None and feedback and feedback['state'] == 'UNCERTAIN':
+                    if self.uncertainty_policy == 'continue' and not feedback['violations']:
+                        # Valid uncertainty is not evidence of failure. Preserve the
+                        # report, temporal history and pending Pi proposal. The next
+                        # bounded chunk supplies new evidence instead of frozen views.
+                        self.uncertain_continuations += 1
+                        self.event('uncertain_continuation', report=feedback,
+                                   max_steps=self.chunk_steps, claims_safe=False)
+                    else:
+                        feedback = self.resolve_uncertainty()
+                        if feedback is None:
+                            if not self.max_uncertainty_reviews:
+                                break
+                            response = self.recover(self.latest_feedback, uncertainty=True)
+                            if response is None:
+                                break
+                if response is not None:
+                    pass
+                elif feedback and feedback['violations']:
                     response = self.recover(feedback)
                     if response is None:
                         break
@@ -319,7 +503,8 @@ class ReplanScheduler:
                         self.start_inference()
                     self.finish_inference()
                     response = automatic_response(self.rollout.request, self.chunk_steps, feedback)
-                    self.transition('SUSPECTED' if feedback and feedback['state'] == 'SUSPECTED' else 'RUNNING')
+                    self.transition('RUNNING_UNCERTAIN' if feedback and feedback['state'] == 'UNCERTAIN'
+                                    else 'SUSPECTED' if feedback and feedback['state'] == 'SUSPECTED' else 'RUNNING')
                 self.fresh(self.rollout.observation_packet)
                 before = self.rollout.tick
                 arguments = self.rollout.next_call().copy()
@@ -332,6 +517,14 @@ class ReplanScheduler:
                 self.frames.append(frame)
                 if self.attempts and self.attempts[-1]['result'] == 'not_executed':
                     self.attempts[-1]['result'] = dict(step_id=self.rollout.tick, observation_id=frame['observation_id'])
+                if self.attempts and self.attempts[-1]['decision']['mode'] == 'replan':
+                    attempt = self.attempts[-1]
+                    attempt.setdefault('executed_subgoals', []).append(dict(
+                        subgoal_id=self.subgoal_id, instruction=self.subgoal,
+                        start_step=before, end_step=self.rollout.tick,
+                        observation_id=frame['observation_id']))
+                    if attempt['result'] == 'plan_installed_without_execution':
+                        attempt['result'] = 'subgoal_controls_executed'
                 self.event('executed_chunk', frame=frame, decision_author=response['decision_author'])
                 self.verify_recovery = response['decision_author'] == 'planner'
                 self.monitor.submit(frame)
@@ -348,11 +541,21 @@ class ReplanScheduler:
             self.transition(state, f'{type(error).__name__}: {error}')
         finally:
             if self.rollout.episode is not None and self.rollout.phase != 'done':
-                native_result = self.rollout.finish('jev_scheduler_stop')
+                try:
+                    native_result = self.rollout.finish('jev_scheduler_stop')
+                except Exception as error:
+                    # A failed simulator RPC may have closed the connection.
+                    # Preserve the original controller failure in the audit.
+                    native_result = dict(complete=False, success=None,
+                                         finish_error=f'{type(error).__name__}: {error}')
+                    self.event('finish_failed', error=native_result['finish_error'])
             else:
                 native_result = getattr(self.rollout, 'observation_packet', {}).get('result')
         result = dict(state=self.state, reason=self.reason, **self.identity,
                       step_id=self.rollout.tick, replan_count=self.replans,
+                      uncertainty_review_count=self.uncertainty_reviews,
+                      uncertainty_policy=self.uncertainty_policy,
+                      uncertain_continuation_count=self.uncertain_continuations,
                       native_result=native_result,
                       max_unreviewed_control_steps=self.chunk_steps,
                       policy_worker_pending=bool(self.inference and self.inference.call.thread.is_alive()),

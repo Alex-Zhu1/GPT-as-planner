@@ -1,5 +1,6 @@
 """Deterministic protocol and scheduling tests; no MuJoCo or GPU dependencies."""
 from copy import deepcopy
+import errno
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,8 +13,25 @@ from ..robodojo.jev.monitor import AsyncMonitor, IDENTITY, MonitorConfig, QUESTI
 from ..robodojo.jev.runner import ReplanScheduler, automatic_response
 from .contract import CONFIG, HORIZON, PROFILE, action_chunk, execution_actions, validate_response
 from .policy import Pi05Client
-from .rollout import LiberoRollout
+from .rollout import LiberoRollout, archive_proposal
 from .session import LiberoSession, measured_observation
+
+
+def test_proposal_archive_on_filesystem_without_hardlinks(tmp_path, monkeypatch):
+    source, destination = tmp_path / 'worker.npz', tmp_path / 'proposal.npz'
+    actions = np.arange(70, dtype=np.float32).reshape(10, 7)
+    np.savez_compressed(source, actions=actions)
+    def no_links(*args):
+        raise OSError(errno.EPERM, 'Hard links unsupported')
+    monkeypatch.setattr('hybrid_rollout.libero.rollout.os.link', no_links)
+    archive_proposal(source, destination)
+    assert source.read_bytes() == destination.read_bytes()
+    with np.load(destination) as saved:
+        np.testing.assert_array_equal(saved['actions'], actions)
+    original = destination.read_bytes()
+    with pytest.raises(FileExistsError):
+        archive_proposal(source, destination)
+    assert destination.read_bytes() == original
 
 
 def raw_observation():
@@ -75,6 +93,28 @@ def scores(**kwargs):
     return {**{k: .95 if k.endswith('attempted') else .05 for k in QUESTIONS}, **kwargs}
 
 
+@pytest.mark.parametrize('success_at,expected_steps,expected_code', [(17, 7, 0), (999, 12, 2)])
+def test_pi_only_baseline_runs_until_native_outcome(tmp_path, monkeypatch, success_at, expected_steps, expected_code):
+    from . import baseline
+    env = Environment(success_at=success_at)
+    session = LiberoSession(env, [0], 'put the bowl on the plate', 12)
+    class PureStudent(Student):
+        def close(self):
+            pass
+    monkeypatch.setattr(baseline, 'Pi05Client', lambda *args, **kwargs: PureStudent())
+    monkeypatch.setattr(baseline, 'create_session', lambda *args: session)
+    monkeypatch.setattr(baseline, 'configure_assets', lambda *args: None)
+    output = tmp_path / 'baseline'
+    code = baseline.main(['--libero-root', str(tmp_path), '--checkpoint', str(tmp_path),
+                          '--output', str(output)])
+    result = json.loads((output / 'result.json').read_text())
+    assert code == expected_code and result['step_id'] == expected_steps
+    assert result['complete'] and result['success'] is (expected_code == 0)
+    assert env.resets == 1 and env.restores == 1 and env.closed
+    assert 'MUST_NOT_REACH_MODEL' not in (output / 'frames.jsonl').read_text()
+    assert not (output / 'jev_events.jsonl').exists()
+
+
 def setup(tmp_path, decision='edit', monitor_fn=None, planner_fn=None, **options):
     env = Environment(success_at=16)
     session = LiberoSession(env, [0], 'put the bowl on the plate', 20)
@@ -110,6 +150,80 @@ def setup(tmp_path, decision='edit', monitor_fn=None, planner_fn=None, **options
     observer = AsyncMonitor(Monitor(), MonitorConfig(), 2.)
     scheduler = ReplanScheduler(rollout, observer, Planner(), **options)
     return scheduler, rollout, env, student, requests, windows
+
+
+def uncertainty_decision(request, mode='student'):
+    decision = automatic_response(request['native_request'], 1, {})
+    decision.pop('decision_author')
+    decision.pop('evaluation_method')
+    decision['mode'] = mode
+    decision['assessment']['intent_status'] = 'aligned'
+    decision['assessment']['intent_evidence'] = 'Fixture: visible target and a bounded approach.'
+    return {**{k: request[k] for k in ('request_id', *IDENTITY)}, 'decision': decision}
+
+
+def test_uncertainty_review_executes_only_one_student_step_then_monitors_again(tmp_path):
+    scheduler, rollout, env, student, requests, windows = setup(tmp_path,
+        max_decisions=3, max_uncertainty_reviews=2, include_initial_context=True,
+        monitor_fn=lambda frames: scores(collision=.5), planner_fn=uncertainty_decision)
+    result = scheduler.run()
+    assert result['state'] == 'STOPPED' and result['reason'] == 'Decision budget exhausted'
+    assert result['step_id'] == 3 and result['replan_count'] == 0
+    assert result['uncertainty_review_count'] == 2
+    assert all(r['review_kind'] == 'uncertainty' and not r['failure']['violations'] for r in requests)
+    assert all(a['decision']['mode'] == 'student' and a['decision']['steps'] == 1
+               for a in result['attempts'])
+    assert all('verification' not in a for a in result['attempts'])
+    assert windows[0][0]['context_only'] and windows[0][0]['step_id'] == 0
+    assert {w[-1]['step_id'] for w in windows} == {1, 2, 3}
+    assert result['latest_feedback']['state'] == 'UNCERTAIN'
+
+
+@pytest.mark.parametrize('fault', ['edit', 'unaligned', 'stale', 'stop', 'timeout'])
+def test_uncertainty_review_cannot_bypass_validation(tmp_path, fault):
+    def planner(request):
+        if fault == 'timeout':
+            raise TimeoutError('Fixture: reviewer unavailable')
+        response = uncertainty_decision(request, 'stop' if fault == 'stop' else 'student')
+        if fault == 'edit':
+            response['decision'].update(mode='edit', edit={'delta': [0.] * 6, 'gripper': 'keep'})
+            response['decision']['assessment']['execution_status'] = 'failed'
+        if fault == 'unaligned':
+            response['decision']['assessment']['intent_status'] = 'uncertain'
+        if fault == 'stale':
+            response['request_id'] = 'old'
+        return response
+    scheduler, *_ = setup(tmp_path, max_decisions=3, max_uncertainty_reviews=2,
+        monitor_fn=lambda frames: scores(collision=.5), planner_fn=planner)
+    result = scheduler.run()
+    assert result['step_id'] == 1
+    assert result['replan_count'] == 0 and result['uncertainty_review_count'] == 1
+    assert result['native_result']['success'] is False
+
+
+def test_uncertainty_review_budget_is_enforced(tmp_path):
+    scheduler, *_ = setup(tmp_path, max_decisions=4, max_uncertainty_reviews=1,
+        monitor_fn=lambda frames: scores(collision=.5), planner_fn=uncertainty_decision)
+    result = scheduler.run()
+    assert result['step_id'] == 2 and result['uncertainty_review_count'] == 1
+    assert result['reason'] == 'Uncertainty review budget exhausted'
+
+
+def test_initial_context_never_casts_a_confirmation_vote(tmp_path):
+    scheduler, *_ = setup(tmp_path, include_initial_context=True)
+    result = scheduler.run()
+    assert result['attempts'][0]['failure']['step_id'] == 2
+    assert result['attempts'][0]['review_kind'] == 'confirmed_failure'
+
+
+def test_uncertainty_option_does_not_bypass_correction_verification(tmp_path):
+    scheduler, *_ = setup(tmp_path, max_uncertainty_reviews=5,
+        monitor_fn=lambda frames: scores(collision=.95 if frames[-1]['plan_revision'] == 0 else .5))
+    result = scheduler.run()
+    assert result['state'] == 'PAUSED_RECOVERY_UNVERIFIED'
+    assert result['step_id'] == 3 and result['replan_count'] == 1
+    assert result['uncertainty_review_count'] == 0
+    assert 'verification' not in result['attempts'][0]
 
 
 def test_observation_rotation_proprio_and_no_privileged_fields():

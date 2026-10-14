@@ -1,7 +1,9 @@
 """File-backed adapter implementing the existing Jev scheduler protocol."""
 from copy import deepcopy
+import errno
 import os
 from pathlib import Path
+import shutil
 import uuid
 
 import numpy as np
@@ -11,10 +13,28 @@ from ..robodojo.io import write_json
 from ..robodojo.jev.runner import automatic_response
 from .contract import PROFILE, RECOVERY_CONTRACT, execution_actions, validate_response
 from .session import CAMERAS
+from .task_context import validate_board_assessment
+
+
+def archive_proposal(source, destination):
+    """Keep the completed worker proposal; DolphinFS may not support hard links."""
+    try:
+        os.link(source, destination)
+        return
+    except OSError as error:
+        if error.errno not in (errno.EPERM, errno.EXDEV, errno.EOPNOTSUPP, errno.ENOSYS):
+            raise
+    with Path(source).open('rb') as incoming, Path(destination).open('xb') as outgoing:
+        try:
+            shutil.copyfileobj(incoming, outgoing)
+        except BaseException:
+            Path(destination).unlink()
+            raise
 
 
 class LiberoRollout:
     validate = staticmethod(validate_response)
+    validate_board_assessment = staticmethod(validate_board_assessment)
     recovery_contract = RECOVERY_CONTRACT
 
     def __init__(self, output, student, session_factory, *, max_decisions=10, chunk_steps=1):
@@ -84,12 +104,18 @@ class LiberoRollout:
         if self.phase != 'infer':
             raise ValueError('Cannot install a proposal at this phase')
         index = len(self.history)
-        os.link(self.proposal_path, self.output / f'proposal_{index:03d}.npz')
+        archive_proposal(self.proposal_path, self.output / f'proposal_{index:03d}.npz')
         self.request = deepcopy(self.observation_packet)
         self.request.pop('result', None)
         self.request.update(request_id=uuid.uuid4().hex, student_instruction=student_instruction,
             max_chunk_steps=self.chunk_steps, proposal_actions=self.actions.tolist(),
+            previous_result=deepcopy(self.history[-1]) if self.history else None,
             action_contract=RECOVERY_CONTRACT, **self.prediction)
+        self.request['eef_control'] = self.session.eef_control()
+        if self.request['eef_control']['supported']:
+            from .eef import command_preview
+            self.request['student_eef_command_preview'] = command_preview(
+                self.actions, self.request['current_eef'], self.request['eef_control'])
         self.request['assessment_example'] = automatic_response(self.request, 1, None if self.tick == 0 else {})['assessment']
         write_json(self.output / f'request_{index:03d}.json', self.request)
         self.phase = 'execute'
@@ -102,9 +128,17 @@ class LiberoRollout:
         if response['mode'] == 'stop':
             return self.finish('planner_stop')
         index, before = len(self.history), self.tick
-        actions = execution_actions(self.actions, response)
         write_json(self.output / f'response_{index:03d}.json', response)
-        executed = self.session.execute(actions)
+        if response['mode'] == 'eef':
+            self.session.eef_trace = []
+            try:
+                executed = self.session.execute_eef(response['target'], self.actions, response['steps'],
+                                                    self.request['current_eef'])
+            finally:
+                self.tick = self.session.tick
+                write_json(self.output / f'eef_{index:03d}.json', self.session.eef_trace)
+        else:
+            executed = self.session.execute(execution_actions(self.actions, response))
         self.tick = self.session.tick
         np.savez_compressed(self.output / f'execution_{index:03d}.npz', actions=executed)
         self.history.append(dict(decision=index, source_detail=response['mode'], start_tick=before,

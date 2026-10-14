@@ -102,3 +102,23 @@ def test_native_score_invalid_layout_and_budget_are_distinct(tmp_path):
     session.finish_reason = 'decision_budget'
     session._write_summary('server_close')
     assert read()['status'] == 'budget_censored' and not read()['valid_for_success_rate']
+
+
+@pytest.mark.parametrize('steps', [15, 25])
+def test_native_session_accepts_student_chunk_without_skipping_controls(tmp_path, monkeypatch, steps):
+    from .robodojo_server import session as module
+    env=NativeLikeEnv()
+    session=RoboDojoSession(env,tmp_path,'build_tower')
+    monkeypatch.setattr(module,'DualKinematics',lambda env:SimpleNamespace(check=lambda:{'passed':True}))
+    def observe(record=False):
+        session.obs=dict(states=np.zeros(14,dtype=np.float32),instruction='Build a tower.')
+        return session.obs
+    monkeypatch.setattr(session,'_observe',observe)
+    session.reset(seed=0,source='student',policy_version='test')
+    result=session.chunk_step(np.zeros((steps,14),dtype=np.float32))
+    assert result['step_id']==steps and len(result['steps'])==steps
+    assert env.take_action_cnt==[steps]
+    assert len(list(session.episode_dir.glob('action_*.json')))==steps
+    with pytest.raises(ValueError,match='1..25'):
+        session.chunk_step(np.zeros((26,14),dtype=np.float32))
+    assert env.take_action_cnt==[steps]

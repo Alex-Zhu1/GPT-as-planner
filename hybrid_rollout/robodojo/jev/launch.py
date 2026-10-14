@@ -73,6 +73,9 @@ def check_ports(ports):
     # This is a preflight check, not a reservation or a readiness probe.
     for port in ports:
         with socket.socket() as sock:
+            # Match restartable HTTP servers: TIME_WAIT is not a live listener.
+            # Without SO_REUSEPORT, an active listener still prevents this bind.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 sock.bind(('127.0.0.1', port))
             except OSError as error:

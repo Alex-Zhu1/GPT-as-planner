@@ -1,0 +1,1529 @@
+{
+  "source": "dynamic-smoke-20261012-evidence-v2; real recorded Valen outputs. Offline score replay only, not a counterfactual rollout.",
+  "reports": [
+    {
+      "step_id": 5,
+      "observation_id": "a23e2bd2a1104716bd9734346875ec35",
+      "scores": {
+        "target_mismatch": 0.2311471219189894,
+        "collision": 0.09053709155610744,
+        "grasp_attempted": 0.3724231719970703,
+        "grasp_failure": 0.14422928871432608,
+        "progress_attempted": 0.9875423532920111,
+        "stuck": 0.5333746115369693,
+        "subgoal_complete": 0.0010383016546337373,
+        "task_advancing": 0.09968221895515092,
+        "task_satisfied": 0.04542386176222511,
+        "target_visible": 0.35847355847139484,
+        "target_held": 0.05400215200324365,
+        "target_on_support": 0.5416474069146756,
+        "target_at_destination": 0.041675630801634375,
+        "scene_comparable": 0.8950896694524537,
+        "arm_approaching": 0.4731276035308838,
+        "arm_transporting": 0.29628628492355347,
+        "arm_releasing": 0.4474033713340759
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.2311471219189894
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.09053709155610744
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.3724231719970703
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.14327476496061423,
+            "failed_attempt": 0.14422928871432608,
+            "no_attempt": 0.2864768718538338,
+            "insufficient_evidence": 0.42601907447122594
+          },
+          "choice": "insufficient_evidence",
+          "confidence": 0.23469209929496793
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9875423532920111
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.5333746115369693,
+            "advancing": 0.09096911617345449,
+            "no_repeated_attempt": 0.09801336450884762,
+            "insufficient_evidence": 0.27764290778072853
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.37783281538262575
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.0010383016546337373,
+            "not_satisfied": 0.38819433564648065,
+            "not_applicable": 0.5245766816198199,
+            "insufficient_evidence": 0.08619068107906576
+          },
+          "choice": "not_applicable",
+          "confidence": 0.3661022421597598
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.09968221895515092,
+            "attempt_no_effect": 0.5655647495181682,
+            "no_attempt": 0.01178314904949386,
+            "insufficient_evidence": 0.32296988247718705
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.42075299935755756
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.04542386176222511
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.35847355847139484
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.05400215200324365
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.5416474069146756
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.041675630801634375
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.32072535635121696,
+            "view_changed_comparable": 0.5743643131012367,
+            "insufficient_evidence": 0.10491033054754631
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.36154646965185505
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.4731276035308838
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.29628628492355347
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.4474033713340759
+        }
+      }
+    },
+    {
+      "step_id": 10,
+      "observation_id": "32ea67eb931c4955b90839dcfe692489",
+      "scores": {
+        "target_mismatch": 0.2522392272949219,
+        "collision": 0.0817974072962613,
+        "grasp_attempted": 0.4585951132000949,
+        "grasp_failure": 0.11242269473323163,
+        "progress_attempted": 0.9605724859621553,
+        "stuck": 0.36018252238563253,
+        "subgoal_complete": 0.0007554432459327525,
+        "task_advancing": 0.10203490828239649,
+        "task_satisfied": 0.07337046613019212,
+        "target_visible": 0.31869475134046366,
+        "target_held": 0.039878702168214986,
+        "target_on_support": 0.6789194750141785,
+        "target_at_destination": 0.03823045857051371,
+        "scene_comparable": 0.9044622172403338,
+        "arm_approaching": 0.4767528332247486,
+        "arm_transporting": 0.2863056489047021,
+        "arm_releasing": 0.49776504927173404
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.2522392272949219
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.0817974072962613
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.4585951132000949
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.07657521791960557,
+            "failed_attempt": 0.11242269473323163,
+            "no_attempt": 0.21256157280739607,
+            "insufficient_evidence": 0.5984405145397668
+          },
+          "choice": "insufficient_evidence",
+          "confidence": 0.46458735271968904
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9605724859621553
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.36018252238563253,
+            "advancing": 0.029735755064577776,
+            "no_repeated_attempt": 0.0639823598266305,
+            "insufficient_evidence": 0.5460993627231592
+          },
+          "choice": "insufficient_evidence",
+          "confidence": 0.3947991502975456
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.0007554432459327525,
+            "not_satisfied": 0.489428308997304,
+            "not_applicable": 0.4020935626944771,
+            "insufficient_evidence": 0.10772268506228616
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.31923774532973864
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.10203490828239649,
+            "attempt_no_effect": 0.47251413756471067,
+            "no_attempt": 0.022661046338756034,
+            "insufficient_evidence": 0.4027899078141368
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.2966855167529476
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.07337046613019212
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.31869475134046366
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.039878702168214986
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6789194750141785
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.03823045857051371
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.4307416686663403,
+            "view_changed_comparable": 0.4737205485739936,
+            "insufficient_evidence": 0.09553778275966611
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.2105808228609904
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.4767528332247486
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.2863056489047021
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.49776504927173404
+        }
+      }
+    },
+    {
+      "step_id": 15,
+      "observation_id": "b302e2e6fd2c48a3aacf8df66f004f67",
+      "scores": {
+        "target_mismatch": 0.25213018811137045,
+        "collision": 0.057226661480665554,
+        "grasp_attempted": 0.49893303218683505,
+        "grasp_failure": 0.11325209995352924,
+        "progress_attempted": 0.9551342085286388,
+        "stuck": 0.3447552794167251,
+        "subgoal_complete": 0.0007727362859297758,
+        "task_advancing": 0.11434249100702619,
+        "task_satisfied": 0.08295315504074097,
+        "target_visible": 0.3857957950708744,
+        "target_held": 0.04016383171813928,
+        "target_on_support": 0.6167952234508031,
+        "target_at_destination": 0.04650031809881566,
+        "scene_comparable": 0.8890672855893724,
+        "arm_approaching": 0.5244513906374988,
+        "arm_transporting": 0.3362484373898246,
+        "arm_releasing": 0.4352427552712785
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.25213018811137045
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.057226661480665554
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.49893303218683505
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.0869464103297469,
+            "failed_attempt": 0.11325209995352924,
+            "no_attempt": 0.2070124534662827,
+            "insufficient_evidence": 0.5927890362504412
+          },
+          "choice": "insufficient_evidence",
+          "confidence": 0.4570520483339216
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9551342085286388
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.3447552794167251,
+            "advancing": 0.014303518870997022,
+            "no_repeated_attempt": 0.05075891876630687,
+            "insufficient_evidence": 0.590182282945971
+          },
+          "choice": "insufficient_evidence",
+          "confidence": 0.4535763772612946
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.0007727362859297758,
+            "not_satisfied": 0.5497377641555012,
+            "not_applicable": 0.3426668722936931,
+            "insufficient_evidence": 0.10682262726487594
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.39965035220733497
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.11434249100702619,
+            "attempt_no_effect": 0.5277208464709687,
+            "no_attempt": 0.013802018369463433,
+            "insufficient_evidence": 0.34413464415254164
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.3702944619612916
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.08295315504074097
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.3857957950708744
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.04016383171813928
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6167952234508031
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.04650031809881566
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.4137802391217631,
+            "view_changed_comparable": 0.47528704646760933,
+            "insufficient_evidence": 0.11093271441062752
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.212930569701414
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.5244513906374988
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.3362484373898246
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.4352427552712785
+        }
+      }
+    },
+    {
+      "step_id": 20,
+      "observation_id": "0a5527fbdad6404e97ecd454bd52967d",
+      "scores": {
+        "target_mismatch": 0.1440434073229167,
+        "collision": 0.014596277011720407,
+        "grasp_attempted": 0.6620357233892596,
+        "grasp_failure": 0.23988412260318534,
+        "progress_attempted": 0.9870522114173715,
+        "stuck": 0.5363763880499974,
+        "subgoal_complete": 0.23211223382767032,
+        "task_advancing": 0.13628441146122072,
+        "task_satisfied": 0.19962338208029812,
+        "target_visible": 0.674085219258951,
+        "target_held": 0.1342892050743103,
+        "target_on_support": 0.7112006333112528,
+        "target_at_destination": 0.2138664712111301,
+        "scene_comparable": 0.9677525912560137,
+        "arm_approaching": 0.6315092036577822,
+        "arm_transporting": 0.24123157508561463,
+        "arm_releasing": 0.5812935829162598
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.1440434073229167
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.014596277011720407
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.6620357233892596
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.4000097155576775,
+            "failed_attempt": 0.23988412260318534,
+            "no_attempt": 0.29082791750597464,
+            "insufficient_evidence": 0.06927824433316257
+          },
+          "choice": "stable_hold",
+          "confidence": 0.20001295407690334
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9870522114173715
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.5363763880499974,
+            "advancing": 0.335462202130497,
+            "no_repeated_attempt": 0.11648663805999938,
+            "insufficient_evidence": 0.011674771759506174
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.3818351840666632
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.23211223382767032,
+            "not_satisfied": 0.5988437276828927,
+            "not_applicable": 0.020947155576600547,
+            "insufficient_evidence": 0.1480968829128364
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.46512497024385696
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.13628441146122072,
+            "attempt_no_effect": 0.6288937353674089,
+            "no_attempt": 0.04060956478345977,
+            "insufficient_evidence": 0.1942122883879106
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.5051916471565452
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.19962338208029812
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.674085219258951
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.1342892050743103
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.7112006333112528
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.2138664712111301
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.5709884081633626,
+            "view_changed_comparable": 0.39676418309265105,
+            "insufficient_evidence": 0.03224740874398636
+          },
+          "choice": "comparable",
+          "confidence": 0.3564826122450439
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.6315092036577822
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.24123157508561463
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5812935829162598
+        }
+      }
+    },
+    {
+      "step_id": 25,
+      "observation_id": "f0eb900d2aa04fcc9663de08a57b386e",
+      "scores": {
+        "target_mismatch": 0.1413499584995204,
+        "collision": 0.01117207185372224,
+        "grasp_attempted": 0.6623816091531994,
+        "grasp_failure": 0.20032618942306857,
+        "progress_attempted": 0.9823212605299032,
+        "stuck": 0.6640052174627586,
+        "subgoal_complete": 0.2733576445418814,
+        "task_advancing": 0.12912735871021758,
+        "task_satisfied": 0.16358122988427148,
+        "target_visible": 0.6013864278793335,
+        "target_held": 0.1194858217392617,
+        "target_on_support": 0.6246138215065002,
+        "target_at_destination": 0.20241671800613403,
+        "scene_comparable": 0.9575409043476495,
+        "arm_approaching": 0.48593419790267944,
+        "arm_transporting": 0.21111903223750092,
+        "arm_releasing": 0.5644112825393677
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.1413499584995204
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.01117207185372224
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.6623816091531994
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.4275746068041479,
+            "failed_attempt": 0.20032618942306857,
+            "no_attempt": 0.3017022536473165,
+            "insufficient_evidence": 0.07039695012546704
+          },
+          "choice": "stable_hold",
+          "confidence": 0.2367661424055305
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9823212605299032
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.6640052174627586,
+            "advancing": 0.23430661769842126,
+            "no_repeated_attempt": 0.08917273547808552,
+            "insufficient_evidence": 0.012515429360734562
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.5520069566170115
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.2733576445418814,
+            "not_satisfied": 0.48853656308271054,
+            "not_applicable": 0.027017689838098373,
+            "insufficient_evidence": 0.2110881025373097
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.3180487507769474
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.12912735871021758,
+            "attempt_no_effect": 0.5892884888285034,
+            "no_attempt": 0.04639806997790411,
+            "insufficient_evidence": 0.2351860824833749
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.45238465177133785
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.16358122988427148
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.6013864278793335
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.1194858217392617
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6246138215065002
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.20241671800613403
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.581301435570754,
+            "view_changed_comparable": 0.37623946877689557,
+            "insufficient_evidence": 0.04245909565235052
+          },
+          "choice": "comparable",
+          "confidence": 0.37195215335613097
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.48593419790267944
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.21111903223750092
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5644112825393677
+        }
+      }
+    },
+    {
+      "step_id": 30,
+      "observation_id": "5247d7f96b204d14935df85847f5724a",
+      "scores": {
+        "target_mismatch": 0.1469663723399154,
+        "collision": 0.011309716471331386,
+        "grasp_attempted": 0.678795714450138,
+        "grasp_failure": 0.19765667175523927,
+        "progress_attempted": 0.9797752694132628,
+        "stuck": 0.6397928112901582,
+        "subgoal_complete": 0.5322418064183982,
+        "task_advancing": 0.20761619894981756,
+        "task_satisfied": 0.3183493221298062,
+        "target_visible": 0.8355515003204346,
+        "target_held": 0.15647008224442968,
+        "target_on_support": 0.6953767330832263,
+        "target_at_destination": 0.2881026055843415,
+        "scene_comparable": 0.9780050588995595,
+        "arm_approaching": 0.5711067489119396,
+        "arm_transporting": 0.21816134452819824,
+        "arm_releasing": 0.6391232419275271
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.1469663723399154
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.011309716471331386
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.678795714450138
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.39745121305917475,
+            "failed_attempt": 0.19765667175523927,
+            "no_attempt": 0.34056364728740646,
+            "insufficient_evidence": 0.06432846789817956
+          },
+          "choice": "stable_hold",
+          "confidence": 0.196601617412233
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9797752694132628
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.6397928112901582,
+            "advancing": 0.26932466978645114,
+            "no_repeated_attempt": 0.08008302889137962,
+            "insufficient_evidence": 0.010799490032010998
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.5197237483868776
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.5322418064183982,
+            "not_satisfied": 0.32349138548156103,
+            "not_applicable": 0.015438792795721643,
+            "insufficient_evidence": 0.12882801530431914
+          },
+          "choice": "satisfied",
+          "confidence": 0.3763224085578643
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.20761619894981756,
+            "attempt_no_effect": 0.5981230847187915,
+            "no_attempt": 0.045341205696411535,
+            "insufficient_evidence": 0.14891951063497944
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.46416411295838866
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.3183493221298062
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.8355515003204346
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.15647008224442968
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6953767330832263
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.2881026055843415
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.6874373606401485,
+            "view_changed_comparable": 0.290567698259411,
+            "insufficient_evidence": 0.02199494110044048
+          },
+          "choice": "comparable",
+          "confidence": 0.5311560409602227
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.5711067489119396
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.21816134452819824
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.6391232419275271
+        }
+      }
+    },
+    {
+      "step_id": 35,
+      "observation_id": "90a1720669c741a8b232806c96622c4e",
+      "scores": {
+        "target_mismatch": 0.1378257952824709,
+        "collision": 0.015729578651382924,
+        "grasp_attempted": 0.4699140629146714,
+        "grasp_failure": 0.3120292537194935,
+        "progress_attempted": 0.9859065212253298,
+        "stuck": 0.576322562519641,
+        "subgoal_complete": 0.21921619446253487,
+        "task_advancing": 0.16781138571323917,
+        "task_satisfied": 0.15071028470993042,
+        "target_visible": 0.822839258399661,
+        "target_held": 0.16652517268844205,
+        "target_on_support": 0.6816975677519311,
+        "target_at_destination": 0.18993390813568373,
+        "scene_comparable": 0.9733364120870311,
+        "arm_approaching": 0.5135334134101868,
+        "arm_transporting": 0.2853210185372526,
+        "arm_releasing": 0.5368801951408386
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.1378257952824709
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.015729578651382924
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.4699140629146714
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.35576484467000696,
+            "failed_attempt": 0.3120292537194935,
+            "no_attempt": 0.27174962927403273,
+            "insufficient_evidence": 0.06045627233646677
+          },
+          "choice": "stable_hold",
+          "confidence": 0.14101979289334263
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9859065212253298
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.576322562519641,
+            "advancing": 0.3140087761749645,
+            "no_repeated_attempt": 0.09904655934088423,
+            "insufficient_evidence": 0.010622101964510348
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.435096750026188
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.21921619446253487,
+            "not_satisfied": 0.5719107900275172,
+            "not_applicable": 0.02883934931696431,
+            "insufficient_evidence": 0.18003366619298358
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.42921438670335627
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.16781138571323917,
+            "attempt_no_effect": 0.6390493774024515,
+            "no_attempt": 0.03247342019232967,
+            "insufficient_evidence": 0.1606658166919797
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.5187325032032687
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.15071028470993042
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.822839258399661
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.16652517268844205
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6816975677519311
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.18993390813568373
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.46700104288196304,
+            "view_changed_comparable": 0.5063353692050682,
+            "insufficient_evidence": 0.026663587912968748
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.25950305380760225
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.5135334134101868
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.2853210185372526
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5368801951408386
+        }
+      }
+    },
+    {
+      "step_id": 40,
+      "observation_id": "0be67234dc6f43f583242147df40fec2",
+      "scores": {
+        "target_mismatch": 0.13540300323358168,
+        "collision": 0.010132195409141117,
+        "grasp_attempted": 0.5123119950294495,
+        "grasp_failure": 0.1856950826410021,
+        "progress_attempted": 0.9839681680192998,
+        "stuck": 0.6015290212370331,
+        "subgoal_complete": 0.39715216451478375,
+        "task_advancing": 0.18745729397035127,
+        "task_satisfied": 0.2012176275616177,
+        "target_visible": 0.8812662696461001,
+        "target_held": 0.2501941919326782,
+        "target_on_support": 0.6915992910623128,
+        "target_at_destination": 0.2563821077346802,
+        "scene_comparable": 0.9709180811258287,
+        "arm_approaching": 0.6621761322021484,
+        "arm_transporting": 0.39141082763671875,
+        "arm_releasing": 0.5093403458595276
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.13540300323358168
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.010132195409141117
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.5123119950294495
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.5153937955029078,
+            "failed_attempt": 0.1856950826410021,
+            "no_attempt": 0.24606780799503553,
+            "insufficient_evidence": 0.052843313861054605
+          },
+          "choice": "stable_hold",
+          "confidence": 0.35385839400387703
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9839681680192998
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.6015290212370331,
+            "advancing": 0.2963411603827024,
+            "no_repeated_attempt": 0.09335980114921298,
+            "insufficient_evidence": 0.008770017231051424
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.4687053616493775
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.39715216451478375,
+            "not_satisfied": 0.41746098736213866,
+            "not_applicable": 0.021954991414136992,
+            "insufficient_evidence": 0.16343185670894064
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.22328131648285154
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.18745729397035127,
+            "attempt_no_effect": 0.579831304326025,
+            "no_attempt": 0.042709376822074416,
+            "insufficient_evidence": 0.19000202488154927
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.43977507243470004
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.2012176275616177
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.8812662696461001
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.2501941919326782
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.6915992910623128
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.2563821077346802
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.5560336579038102,
+            "view_changed_comparable": 0.4148844232220185,
+            "insufficient_evidence": 0.029081918874171282
+          },
+          "choice": "comparable",
+          "confidence": 0.3340504868557153
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.6621761322021484
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.39141082763671875
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5093403458595276
+        }
+      }
+    },
+    {
+      "step_id": 45,
+      "observation_id": "b32a8b92103e4cdeb9c28ac59bc7a633",
+      "scores": {
+        "target_mismatch": 0.11645993901565899,
+        "collision": 0.009265461574169447,
+        "grasp_attempted": 0.5758977107971225,
+        "grasp_failure": 0.16308305185538222,
+        "progress_attempted": 0.9854305505357789,
+        "stuck": 0.5019778702776483,
+        "subgoal_complete": 0.5516838225840098,
+        "task_advancing": 0.29432020029902756,
+        "task_satisfied": 0.22142082452774048,
+        "target_visible": 0.8609730261854239,
+        "target_held": 0.24184292554855347,
+        "target_on_support": 0.8033831476156965,
+        "target_at_destination": 0.29463160037994385,
+        "scene_comparable": 0.9562842275926932,
+        "arm_approaching": 0.786862337197731,
+        "arm_transporting": 0.34786166704113286,
+        "arm_releasing": 0.6894683837890625
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.11645993901565899
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.009265461574169447
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.5758977107971225
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.5427263055606898,
+            "failed_attempt": 0.16308305185538222,
+            "no_attempt": 0.24925990407109833,
+            "insufficient_evidence": 0.04493073851282963
+          },
+          "choice": "stable_hold",
+          "confidence": 0.3903017407475864
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9854305505357789
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.5019778702776483,
+            "advancing": 0.4005591645940983,
+            "no_repeated_attempt": 0.08949440139335396,
+            "insufficient_evidence": 0.007968563734899532
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.33597049370353105
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.5516838225840098,
+            "not_satisfied": 0.32101415391958676,
+            "not_applicable": 0.017680249449601417,
+            "insufficient_evidence": 0.109621774046802
+          },
+          "choice": "satisfied",
+          "confidence": 0.40224509677867976
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.29432020029902756,
+            "attempt_no_effect": 0.5184169488909386,
+            "no_attempt": 0.031455174557196715,
+            "insufficient_evidence": 0.15580767625283712
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.35788926518791814
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.22142082452774048
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.8609730261854239
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.24184292554855347
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.8033831476156965
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.29463160037994385
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.5541727808610928,
+            "view_changed_comparable": 0.4021114467316004,
+            "insufficient_evidence": 0.04371577240730688
+          },
+          "choice": "comparable",
+          "confidence": 0.3312591712916392
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.786862337197731
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.34786166704113286
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.6894683837890625
+        }
+      }
+    },
+    {
+      "step_id": 50,
+      "observation_id": "291de0cfb9144391a8ddb10967771d80",
+      "scores": {
+        "target_mismatch": 0.17220119362170128,
+        "collision": 0.01573634974773562,
+        "grasp_attempted": 0.2792949461726828,
+        "grasp_failure": 0.1754814237356186,
+        "progress_attempted": 0.984962082818102,
+        "stuck": 0.42151478089956484,
+        "subgoal_complete": 0.15734495838031942,
+        "task_advancing": 0.21113997693486675,
+        "task_satisfied": 0.11635969717414767,
+        "target_visible": 0.4478092460518626,
+        "target_held": 0.08346949144589194,
+        "target_on_support": 0.7721200104373696,
+        "target_at_destination": 0.1518802895581636,
+        "scene_comparable": 0.95662394036722,
+        "arm_approaching": 0.737036190540677,
+        "arm_transporting": 0.21669627403175423,
+        "arm_releasing": 0.5603098273277283
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.17220119362170128
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.01573634974773562
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.2792949461726828
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.3215668499469757,
+            "failed_attempt": 0.1754814237356186,
+            "no_attempt": 0.43119069933891296,
+            "insufficient_evidence": 0.07176102697849274
+          },
+          "choice": "no_attempt",
+          "confidence": 0.24158759911855063
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.984962082818102
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.42151478089956484,
+            "advancing": 0.45184305478573983,
+            "no_repeated_attempt": 0.11573768450222047,
+            "insufficient_evidence": 0.010904479812474846
+          },
+          "choice": "advancing",
+          "confidence": 0.2691240730476531
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.15734495838031942,
+            "not_satisfied": 0.6547739761886252,
+            "not_applicable": 0.0263374364992346,
+            "insufficient_evidence": 0.16154362893182078
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.5396986349181669
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.21113997693486675,
+            "attempt_no_effect": 0.5130635732851628,
+            "no_attempt": 0.04349238490180927,
+            "insufficient_evidence": 0.23230406487816113
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.3507514310468838
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.11635969717414767
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.4478092460518626
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.08346949144589194
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.7721200104373696
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.1518802895581636
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.4017909884986576,
+            "view_changed_comparable": 0.5548329518685624,
+            "insufficient_evidence": 0.04337605963277995
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.3322494278028436
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.737036190540677
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.21669627403175423
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5603098273277283
+        }
+      }
+    },
+    {
+      "step_id": 55,
+      "observation_id": "8b7fe94021764cb389ba9a456d00ed86",
+      "scores": {
+        "target_mismatch": 0.17865740188018073,
+        "collision": 0.011516880115305482,
+        "grasp_attempted": 0.2773914933204651,
+        "grasp_failure": 0.15007080956976968,
+        "progress_attempted": 0.9738497482671313,
+        "stuck": 0.5315949857429231,
+        "subgoal_complete": 0.27387019940862395,
+        "task_advancing": 0.17952157088871673,
+        "task_satisfied": 0.12292486429214478,
+        "target_visible": 0.6785416198646057,
+        "target_held": 0.1033474273730261,
+        "target_on_support": 0.7420248014338255,
+        "target_at_destination": 0.1816999668389549,
+        "scene_comparable": 0.9449925650284248,
+        "arm_approaching": 0.718112668934842,
+        "arm_transporting": 0.18186924403516186,
+        "arm_releasing": 0.5735148958419233
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.17865740188018073
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.011516880115305482
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.2773914933204651
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.37002058163193247,
+            "failed_attempt": 0.15007080956976968,
+            "no_attempt": 0.4143886678939163,
+            "insufficient_evidence": 0.06551994090438153
+          },
+          "choice": "no_attempt",
+          "confidence": 0.21918489052522175
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9738497482671313
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.5315949857429231,
+            "advancing": 0.3574059267632001,
+            "no_repeated_attempt": 0.09835883865104424,
+            "insufficient_evidence": 0.012640248842832645
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.3754599809905641
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.27387019940862395,
+            "not_satisfied": 0.5462636937456882,
+            "not_applicable": 0.026589320923035367,
+            "insufficient_evidence": 0.1532767859226525
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.39501825832758425
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.17952157088871673,
+            "attempt_no_effect": 0.5444510437132518,
+            "no_attempt": 0.046344230605626056,
+            "insufficient_evidence": 0.22968315479240536
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.3926013916176691
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.12292486429214478
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.6785416198646057
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.1033474273730261
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.7420248014338255
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.1816999668389549
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.439695623221281,
+            "view_changed_comparable": 0.5052969418071438,
+            "insufficient_evidence": 0.055007434971575175
+          },
+          "choice": "view_changed_comparable",
+          "confidence": 0.2579454127107157
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.718112668934842
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.18186924403516186
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.5735148958419233
+        }
+      }
+    },
+    {
+      "step_id": 60,
+      "observation_id": "f9a181b79ab849978d492ea2d20b3a50",
+      "scores": {
+        "target_mismatch": 0.17363576849752319,
+        "collision": 0.010421357815980364,
+        "grasp_attempted": 0.3120691180229187,
+        "grasp_failure": 0.12546792392678702,
+        "progress_attempted": 0.9733217016356137,
+        "stuck": 0.4998988048206473,
+        "subgoal_complete": 0.38265258915801037,
+        "task_advancing": 0.2560247750279519,
+        "task_satisfied": 0.1510789177829511,
+        "target_visible": 0.7470221296840271,
+        "target_held": 0.14752154272081766,
+        "target_on_support": 0.7649750227477405,
+        "target_at_destination": 0.22676376184117084,
+        "scene_comparable": 0.9483346892894526,
+        "arm_approaching": 0.7823517568848242,
+        "arm_transporting": 0.20567104791085208,
+        "arm_releasing": 0.6689440807385468
+      },
+      "raw_answers": {
+        "target_mismatch": {
+          "type": "noul",
+          "noul": 0.17363576849752319
+        },
+        "collision": {
+          "type": "noul",
+          "noul": 0.010421357815980364
+        },
+        "grasp_attempted": {
+          "type": "noul",
+          "noul": 0.3120691180229187
+        },
+        "grasp_failure": {
+          "type": "choice",
+          "probabilities": {
+            "stable_hold": 0.4226725916811714,
+            "failed_attempt": 0.12546792392678702,
+            "no_attempt": 0.38979529608422336,
+            "insufficient_evidence": 0.06206418830781824
+          },
+          "choice": "stable_hold",
+          "confidence": 0.23023012224156184
+        },
+        "progress_attempted": {
+          "type": "noul",
+          "noul": 0.9733217016356137
+        },
+        "stuck": {
+          "type": "choice",
+          "probabilities": {
+            "repeated_no_effect": 0.4998988048206473,
+            "advancing": 0.40544299949844836,
+            "no_repeated_attempt": 0.08395685726917348,
+            "insufficient_evidence": 0.010701338411730859
+          },
+          "choice": "repeated_no_effect",
+          "confidence": 0.33319840642752974
+        },
+        "subgoal_complete": {
+          "type": "choice",
+          "probabilities": {
+            "satisfied": 0.38265258915801037,
+            "not_satisfied": 0.45598486498082813,
+            "not_applicable": 0.021010423767729266,
+            "insufficient_evidence": 0.14035212209343229
+          },
+          "choice": "not_satisfied",
+          "confidence": 0.2746464866411042
+        },
+        "task_advancing": {
+          "type": "choice",
+          "probabilities": {
+            "advancing": 0.2560247750279519,
+            "attempt_no_effect": 0.546658569425435,
+            "no_attempt": 0.0341329980552234,
+            "insufficient_evidence": 0.16318365749138977
+          },
+          "choice": "attempt_no_effect",
+          "confidence": 0.39554475923391336
+        },
+        "task_satisfied": {
+          "type": "noul",
+          "noul": 0.1510789177829511
+        },
+        "target_visible": {
+          "type": "noul",
+          "noul": 0.7470221296840271
+        },
+        "target_held": {
+          "type": "noul",
+          "noul": 0.14752154272081766
+        },
+        "target_on_support": {
+          "type": "noul",
+          "noul": 0.7649750227477405
+        },
+        "target_at_destination": {
+          "type": "noul",
+          "noul": 0.22676376184117084
+        },
+        "scene_comparable": {
+          "type": "choice",
+          "probabilities": {
+            "comparable": 0.5317310570237985,
+            "view_changed_comparable": 0.4166036322656541,
+            "insufficient_evidence": 0.051665310710547335
+          },
+          "choice": "comparable",
+          "confidence": 0.2975965855356978
+        },
+        "arm_approaching": {
+          "type": "noul",
+          "noul": 0.7823517568848242
+        },
+        "arm_transporting": {
+          "type": "noul",
+          "noul": 0.20567104791085208
+        },
+        "arm_releasing": {
+          "type": "noul",
+          "noul": 0.6689440807385468
+        }
+      }
+    }
+  ]
+}

@@ -188,20 +188,70 @@ def test_unknown_does_not_request_planner(tmp_path):
     assert not requests
 
 
+def test_unknown_continues_to_native_success_without_discard_or_teacher(tmp_path):
+    runner, rollout, requests, windows, events = setup(tmp_path,
+        monitor_fn=lambda fs: scores(grasp_failure=.5), uncertainty_policy='continue')
+    result = runner.run()
+    assert result['native_result']['success'] and rollout.tick == LongSim.horizon
+    assert result['uncertain_continuation_count'] == LongSim.horizon - 1
+    assert not requests and not rollout.sim.calls.count('refresh_observation')
+    assert not any(e['kind'] == 'policy_discarded' for e in events)
+    assert len(windows) == LongSim.horizon
+    assert all(e['report']['state'] == 'UNCERTAIN' for e in events if e['kind'] == 'monitor_report')
+
+
+def test_progress_review_calls_planner_without_fabricating_failure(tmp_path):
+    def planner(request):
+        decision = response(request['native_request'], 'student')
+        decision['steps'] = 1
+        decision['assessment']['execution_status'] = 'uncertain'
+        return dict(**{k:request[k] for k in ('request_id', *IDENTITY)}, decision=decision)
+    runner, rollout, requests, _, events = setup(tmp_path,
+        monitor_fn=lambda fs: scores(grasp_failure=.5), planner_fn=planner,
+        uncertainty_policy='continue')
+    runner.progress_review = lambda report: (dict(state='PROGRESS_REVIEW', violations=[],
+        first_step=1, confirmed_failure=False) if report['step_id']==2 else None)
+    result = runner.run()
+    assert result['native_result']['success'] and len(requests)==1
+    assert requests[0]['review_kind']=='progress' and not requests[0]['failure']['violations']
+    assert result['attempts'][0]['review_kind']=='progress'
+    assert result['attempts'][0]['result'] != 'not_executed'
+    assert any(e['kind']=='recovery_observed_uncertain' for e in events)
+    assert not any(e['kind']=='recovery_verified' for e in events)
+
+
+def test_continue_unknown_still_recovers_confirmed_failure(tmp_path):
+    def monitor(fs):
+        current = fs[-1]
+        return scores(grasp_failure=(.5 if current['step_id'] == 1 else .95)
+                      if current['plan_revision'] == 0 else .05)
+    runner, rollout, requests, _, events = setup(tmp_path, monitor_fn=monitor,
+                                               uncertainty_policy='continue')
+    result = runner.run()
+    assert result['native_result']['success'] and len(requests) == 1
+    assert requests[0]['failure']['violations']
+    assert result['uncertain_continuation_count'] == 1
+    assert any(e['kind'] == 'recovery_verified' for e in events)
+
+
 @pytest.mark.parametrize('fault', ['exception', 'stale', 'timeout'])
-def test_monitor_failure_stops_without_planner(tmp_path, fault):
+@pytest.mark.parametrize('uncertainty_policy', ['pause', 'continue'])
+def test_monitor_failure_stops_without_planner(tmp_path, fault, uncertainty_policy):
     release = Event()
     def monitor(frames):
         if fault == 'exception':
             raise RuntimeError('unavailable')
         if fault == 'timeout':
             release.wait(2)
-        else:
-            time.sleep(.03)
+        elif fault == 'stale':
+            # Expire the monitor sample, not the pre-action policy proposal.
+            # A 20 ms wall-clock budget also expired unrelated setup on busy hosts.
+            frames[-1]['captured_at'] -= 2 * config.max_age_s
         return scores(grasp_failure=.95)
-    config = MonitorConfig(max_age_s=.02) if fault == 'stale' else MonitorConfig()
+    config = MonitorConfig()
     runner, rollout, requests, _, _ = setup(tmp_path, monitor_fn=monitor, config=config,
-                                           monitor_timeout=.01 if fault == 'timeout' else 2.)
+                                           monitor_timeout=.01 if fault == 'timeout' else 2.,
+                                           uncertainty_policy=uncertainty_policy)
     try:
         result = runner.run()
         assert result['state'] == 'PAUSED_MONITOR_UNAVAILABLE'
@@ -243,10 +293,14 @@ def test_planner_timeout_cannot_install_late_result(tmp_path):
         release.wait(2)
         finished.set()
         return {}
-    runner, rollout, requests, _, _ = setup(tmp_path, planner_fn=planner, planner_timeout=.01)
+    runner, rollout, requests, _, events = setup(tmp_path, planner_fn=planner, planner_timeout=.01)
+    runner.planner.diagnostics = lambda: dict(request_id='a'*32, stage='waiting_gateway_headers')
     try:
         result = runner.run()
         assert result['state'] == 'STOPPED' and rollout.tick == 2
+        timeout = next(e for e in events if e['kind'] == 'planner_timeout')
+        assert timeout['worker_alive'] and timeout['timeout_seconds'] == .01
+        assert timeout['transport'] == runner.planner.diagnostics()
     finally:
         release.set()
         assert finished.wait(2)
@@ -445,8 +499,10 @@ def test_repeated_paused_high_scores_cannot_confirm_a_failure(tmp_path):
     assert rollout.sim.calls.count('refresh_observation') == 3
 
 
-def test_unverified_eef_correction_never_hands_back_to_vla(tmp_path):
-    runner, rollout, requests, _, events = setup(tmp_path, monitor_fn=lambda fs: scores(grasp_failure=.95))
+@pytest.mark.parametrize('uncertainty_policy', ['pause', 'continue'])
+def test_unverified_eef_correction_never_hands_back_to_vla(tmp_path, uncertainty_policy):
+    runner, rollout, requests, _, events = setup(tmp_path, monitor_fn=lambda fs: scores(grasp_failure=.95),
+                                               uncertainty_policy=uncertainty_policy)
     result = runner.run()
     assert result['state'] == 'PAUSED_RECOVERY_UNVERIFIED'
     assert rollout.tick == 3 and len(requests) == 1
@@ -508,6 +564,8 @@ def test_high_level_replan_reaches_actual_policy_and_retains_original_task(tmp_p
     assert all(f['subgoal_id'] == w[-1]['subgoal_id'] for w in windows for f in w)
     assert [e['subgoal']['subgoal_id'] for e in events if e['kind'] == 'subgoal_completed'] == ['retry', 'place']
     assert result['remaining_plan'][-1]['subgoal_id'] == 'original-task'
+    assert result['attempts'][0]['result'] == 'subgoal_controls_executed'
+    assert {'retry','place'} <= {x['subgoal_id'] for x in result['attempts'][0]['executed_subgoals']}
 
 
 @pytest.mark.parametrize('fault', ['no_condition', 'duplicate_id', 'reserved_id', 'code', 'stale'])

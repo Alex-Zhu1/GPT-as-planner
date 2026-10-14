@@ -45,7 +45,7 @@ the model server, checkpoint, or its robot-specific normalization assets.
 | Simulator | RoboDojo source/assets, Isaac Sim 5.1 and matching IsaacLab setup | Simulator server adapter |
 | pi05 | Compatible OpenPI/JAX environment and checkpoint | Policy server entry point |
 | Valen | Your Valen deployment's own dependencies and weights | HTTP Noul client only |
-| Astra | Authorized backend and compatible Codex executable, or external HTTP Planner | Recovery client and decision protocol |
+| Astra | Authorized Codex executable, local image model gateway, or external HTTP Planner | Recovery client and decision protocol |
 
 Do not install Isaac, torch, transformers, or jax into the controller merely to
 satisfy a different service. Their versions must come from the corresponding
@@ -57,6 +57,9 @@ For `--codex`, configure the repository's authorized backend/profile first; the
 checked-in gateway is a `.invalid` placeholder. This requirements file does not
 install or authenticate the Codex executable. `--planner-url` is the alternative
 when a compatible HTTP Planner is already available.
+`--planner-backend api` instead uses the running image gateway documented in
+`README.md`; it requires no Codex executable in the controller environment and
+uses the existing Python standard library for HTTP.
 
 ## Start the services
 

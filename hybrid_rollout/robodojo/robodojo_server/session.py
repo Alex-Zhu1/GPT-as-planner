@@ -142,8 +142,8 @@ class RoboDojoSession:
     def chunk_step(self, actions, **kwargs):
         require(not self.finished and not self.terminated and not self.truncated, 'Episode finished')
         a = np.asarray(actions, np.float32)
-        require(a.ndim == 2 and a.shape[1] == 14 and 1 <= len(a) <= 15 and np.isfinite(a).all(),
-                'Expected 1..15 finite 14D absolute actions')
+        require(a.ndim == 2 and a.shape[1] == 14 and 1 <= len(a) <= 25 and np.isfinite(a).all(),
+                'Expected 1..25 finite 14D absolute actions')
         require(np.all((a[:, [6, 13]] >= 0) & (a[:, [6, 13]] <= 1)), 'Invalid gripper opening')
         rows = []
         for action in a:

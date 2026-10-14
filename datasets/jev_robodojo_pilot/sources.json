@@ -1,0 +1,136 @@
+{
+  "format_reference": {
+    "url": "https://github.com/Liuziyu77/Valen/blob/main/docs/data-format.md",
+    "git_blob_sha": "ae6a98530274ff08288f3c6474d22656b7d11963",
+    "schema_git_blob_sha": "d8f94ebb3ecede125799eaceef6c4d4b4fa826d1"
+  },
+  "source_root": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013",
+  "camera_order_in_recorded_video": [
+    "cam_high",
+    "cam_left_wrist",
+    "cam_right_wrist"
+  ],
+  "time_mapping": "frame_index = simulation_step; simulation_seconds = step * 0.04; initial observation is frame 0",
+  "cases": {
+    "01-organize_table": {
+      "directory": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/01-organize_table",
+      "episode_id": "684dafd3943a4cc3aff477d6aaedb164",
+      "instruction": "Place the mouse on the mouse pad, push the keyboard into the frame, put the figurine on the stand, place the alarm clock on the drawer, then open the drawer and put all remaining miscellaneous items inside.",
+      "native_success": false,
+      "case_identity": {
+        "panel_id": "robodojo_ten_source_panel_20261013",
+        "panel_sha256": "45577e2dc29abe9918a275a9f29f42ccc76674b4fabd17555f10e90b7a151821",
+        "case_id": "organize_table__standard__g0__l0",
+        "task": "organize_table",
+        "runtime_task": "organize_table",
+        "variant": "standard",
+        "eval_seed": 0,
+        "layout_id": 0,
+        "reset_seed": 0,
+        "simulator_initial_seed": 0,
+        "policy_rng_seed": 0,
+        "layout_sha256": "e55e5cffef73b1967ad26dc0c7c8933ce05e68f329450ae0ac933abf386fa5ba"
+      },
+      "source_video": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/01-organize_table/sim/sensors.mp4",
+      "source_video_sha256": "0e6178516a01a42ba72d22637c6cd7a4583f16a8e5aeb9ef0281905385080bc7",
+      "video": {
+        "width": 1920,
+        "height": 360,
+        "r_frame_rate": "25/1",
+        "duration": "40.040000",
+        "nb_frames": "1001"
+      },
+      "control_dt": 0.04
+    },
+    "10-put_bottles_into_dustbin": {
+      "directory": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/10-put_bottles_into_dustbin",
+      "episode_id": "d74fd7f3e4bf48ad8b3c1587c733819b",
+      "instruction": "Pick up the bottles and throw them into the dustbin, using handover when needed.",
+      "native_success": false,
+      "case_identity": {
+        "panel_id": "robodojo_ten_source_panel_20261013",
+        "panel_sha256": "45577e2dc29abe9918a275a9f29f42ccc76674b4fabd17555f10e90b7a151821",
+        "case_id": "put_bottles_into_dustbin__standard__g0__l0",
+        "task": "put_bottles_into_dustbin",
+        "runtime_task": "put_bottles_into_dustbin",
+        "variant": "standard",
+        "eval_seed": 0,
+        "layout_id": 0,
+        "reset_seed": 0,
+        "simulator_initial_seed": 0,
+        "policy_rng_seed": 0,
+        "layout_sha256": "3c2168f460d48dde2d72d55429f1af7e850725b642dfcb8c8d5e31ed2ec25537"
+      },
+      "source_video": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/10-put_bottles_into_dustbin/sim/sensors.mp4",
+      "source_video_sha256": "d3d18d59a6501bc4edad5ddc0961cea038c0c0b35a5c37e9332b9e91ed8f104b",
+      "video": {
+        "width": 1920,
+        "height": 360,
+        "r_frame_rate": "25/1",
+        "duration": "28.040000",
+        "nb_frames": "701"
+      },
+      "control_dt": 0.04
+    },
+    "06-classify_objects": {
+      "directory": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/06-classify_objects",
+      "episode_id": "3f606f61ee9a49b08cad9e6abb899b3a",
+      "instruction": "Sort the objects by category into the three baskets.",
+      "native_success": true,
+      "case_identity": {
+        "panel_id": "robodojo_ten_source_panel_20261013",
+        "panel_sha256": "45577e2dc29abe9918a275a9f29f42ccc76674b4fabd17555f10e90b7a151821",
+        "case_id": "classify_objects__standard__g0__l0",
+        "task": "classify_objects",
+        "runtime_task": "classify_objects",
+        "variant": "standard",
+        "eval_seed": 0,
+        "layout_id": 0,
+        "reset_seed": 0,
+        "simulator_initial_seed": 0,
+        "policy_rng_seed": 0,
+        "layout_sha256": "5ceb9e18e6d8490a7db85dd001462d63265c297ea6fad0d7438364deb2de3ece"
+      },
+      "source_video": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/06-classify_objects/sim/sensors.mp4",
+      "source_video_sha256": "4f9db60f483449174bfd37de316159a0154cbe0e877f5eac51ba489fca2db6f2",
+      "video": {
+        "width": 1920,
+        "height": 360,
+        "r_frame_rate": "25/1",
+        "duration": "36.960000",
+        "nb_frames": "924"
+      },
+      "control_dt": 0.04
+    },
+    "02-classify_objects_by_language": {
+      "directory": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/02-classify_objects_by_language",
+      "episode_id": "27960b3fc0614b6d9f181a61994a33bf",
+      "instruction": "Put car objects into the left basket, watch objects into the middle basket, and wooden_toy objects into the right basket, then reset the robot arm.",
+      "native_success": false,
+      "case_identity": {
+        "panel_id": "robodojo_ten_source_panel_20261013",
+        "panel_sha256": "45577e2dc29abe9918a275a9f29f42ccc76674b4fabd17555f10e90b7a151821",
+        "case_id": "classify_objects_by_language__standard__g0__l0",
+        "task": "classify_objects_by_language",
+        "runtime_task": "classify_objects_by_language",
+        "variant": "standard",
+        "eval_seed": 0,
+        "layout_id": 0,
+        "reset_seed": 0,
+        "simulator_initial_seed": 0,
+        "policy_rng_seed": 0,
+        "layout_sha256": "eb7bc205a8e5f3acad8fdada3bf7a26b8e11fc39d7944f434aa4989356044eb2"
+      },
+      "source_video": "/mnt/data_hdd/mhzhu/JevHarnessEnv/runs/robodojo-ten-pi05-only-20261013/02-classify_objects_by_language/sim/sensors.mp4",
+      "source_video_sha256": "bebe9cc4c36862e409a4977d6707dfca07aa0dc36d8f29abab64c95d3112bdc5",
+      "video": {
+        "width": 1920,
+        "height": 360,
+        "r_frame_rate": "25/1",
+        "duration": "44.040000",
+        "nb_frames": "1101"
+      },
+      "control_dt": 0.04
+    }
+  }
+}

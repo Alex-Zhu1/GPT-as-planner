@@ -75,10 +75,13 @@ class RoboDojoTools:
         return [{arm: bool(row[i*7+6] < .5) for i, arm in enumerate(ARMS)} for row in executed]
 
     def __init__(self, output, task, student, *, sim_port=19113, seed=0,
-                 max_decisions=180, prompt_sha256='', rpc_factory=RPCClient):
+                 max_decisions=180, prompt_sha256='', rpc_factory=RPCClient, student_step_limit=15):
         self.output = Path(output).resolve()
         self.task, self.student = task, student
         self.sim_port, self.seed = sim_port, seed
+        if type(student_step_limit) is not int or not 1 <= student_step_limit <= 25:
+            raise ValueError('Student execution limit must be in 1..25')
+        self.student_step_limit = student_step_limit
         if max_decisions < 0:
             raise ValueError('max_decisions must be non-negative; 0 uses native termination only')
         self.max_decisions, self.prompt_sha256 = max_decisions, prompt_sha256
@@ -220,6 +223,7 @@ class RoboDojoTools:
             step_id=self.tick, decision=decision, gate_policy='failure-or-intent',
             gate_instruction=GATE_INSTRUCTION, task=self.task, instruction=self.obs['instruction'],
             student_instruction=student_instruction or self.obs['instruction'],
+            student_step_limit=self.student_step_limit,
             sim_time_s=self.tick*self.meta['control_dt'],
             max_episode_steps=self.meta['max_episode_steps'],
             remaining_steps=self.obs['remaining_steps'],

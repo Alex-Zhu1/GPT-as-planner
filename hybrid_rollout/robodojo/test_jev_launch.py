@@ -46,6 +46,7 @@ def test_startup_failure_never_starts_controller(tmp_path, service):
 
 def test_port_check_does_not_connect(tmp_path):
     with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(('127.0.0.1', 0))
         listener.listen()
         listener.settimeout(.05)
@@ -53,6 +54,19 @@ def test_port_check_does_not_connect(tmp_path):
             check_ports([listener.getsockname()[1]])
         with pytest.raises(socket.timeout):
             listener.accept()
+
+
+def test_port_check_allows_closed_http_connection():
+    with socket.socket() as listener, socket.socket() as client:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(('127.0.0.1', 0))
+        port = listener.getsockname()[1]
+        listener.listen()
+        client.connect(('127.0.0.1', port))
+        connection, _ = listener.accept()
+        connection.close()  # Server initiates close, leaving TIME_WAIT.
+        assert client.recv(1) == b''
+    check_ports([port])
 
 
 def test_output_must_be_new(tmp_path):

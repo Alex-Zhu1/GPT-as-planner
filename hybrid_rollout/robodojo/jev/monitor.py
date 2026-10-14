@@ -30,6 +30,94 @@ QUESTIONS = {
 CONSTRAINTS = {'target_mismatch': (None, 2), 'collision': (None, 2),
                'grasp_failure': ('grasp_attempted', 2), 'stuck': ('progress_attempted', 3)}
 IDENTITY = ('run_id', 'episode_id', 'plan_revision', 'subgoal_id', 'program_id')
+VISUAL_INPUT_FORMAT = 'jev_scene_evidence_v1'
+VISUAL_FRAME_FIELDS = (*IDENTITY, 'step_id', 'observation_id', 'captured_at',
+    'task', 'subgoal', 'success_condition', 'executed_start_step',
+    'context_only', 'inspection_only')
+
+
+def visual_frame(frame):
+    """Project host audit records to scene evidence at the model boundary."""
+    result = {key: deepcopy(frame[key]) for key in VISUAL_FRAME_FIELDS if key in frame}
+    result['images'] = [{key: image[key] for key in ('camera', 'path')}
+                        for image in frame['images']]
+    return result
+
+# Opt-in profile: separate task advancement from motion and safety constraints.
+TASK_QUESTIONS = {
+    'task_advancing': 'Between the two latest distinct executed endpoints, is there NEW visible progress '
+        'toward the original task or a necessary prerequisite? Robot motion, repeated failed attempts, '
+        'or progress already visible at both endpoints do not count. If ambiguous answer uncertain.',
+    'task_satisfied': 'Are ALL requirements of the original task visibly satisfied now? '
+        'Do not substitute completion of a recovery instruction for the original task.',
+    'target_visible': 'Is the object being manipulated for the current subgoal identifiable in the latest views? '
+        'If multiple possible targets cannot be distinguished, answer uncertain.',
+    'target_held': 'Is that target visibly held by the gripper, supported by relative motion across views? '
+        'A closed gripper command alone is not evidence.',
+    'target_on_support': 'Is that target visibly resting on an environmental support surface now, '
+        'rather than suspended by the gripper?',
+    'target_at_destination': 'Is that target visibly at the destination required by the original task? '
+        'If no destination is specified or identifiable, answer uncertain.',
+    'scene_comparable': 'Can the target and its relations be reliably compared between the two latest '
+        'distinct executed endpoints? Camera/view changes or occlusion are not object movement. '
+        'If continuity is lost answer low or uncertain.',
+    'arm_approaching': 'Does the latest executed segment visibly approach or align the gripper with '
+        'the current target? Judge executed behavior, not the instruction alone.',
+    'arm_transporting': 'Does the latest executed segment visibly transport the target together with the gripper?',
+    'arm_releasing': 'Does the latest executed segment visibly release the target from the gripper?',
+}
+
+
+# Candidate descriptions, not IDs, are the text scored by Valen.
+CHOICES = {
+    'scene_comparable': ('Compare the latest two endpoints, matching cameras and using both views.', {
+        'comparable': 'The target and its relations can be reliably compared.',
+        'view_changed_comparable': 'The viewpoint changed but target continuity remains reliable.',
+        'insufficient_evidence': 'Occlusion, ambiguity or viewpoint change prevents reliable comparison.'}),
+    'task_advancing': ('Compare the latest executed segment against the CURRENT instruction, including necessary retreat or alignment. Motion alone is not progress.', {
+        'advancing': 'There is new visible progress toward the current instruction.',
+        'attempt_no_effect': 'An attempt is visible without visible progress toward the instruction.',
+        'no_attempt': 'No actual attempt is visible.',
+        'insufficient_evidence': 'The images do not reliably distinguish progress from no progress.'}),
+    'stuck': ('Compare the entire chronological window. Judge executed behavior, not proposed actions.', {
+        'repeated_no_effect': 'Repeated attempts are visible without visible effect toward the current instruction.',
+        'advancing': 'The sequence shows visible progress.',
+        'no_repeated_attempt': 'Repeated attempts are not visible.',
+        'insufficient_evidence': 'Temporal or visual evidence is insufficient.'}),
+    'grasp_failure': ('Compare actual grasp attempts and their aftermath across the supplied views.', {
+        'stable_hold': 'The target visibly moves stably with the gripper.',
+        'failed_attempt': 'An attempted grasp visibly misses, slips or drops the target.',
+        'no_attempt': 'No grasp attempt is observed.',
+        'insufficient_evidence': 'Grasp outcome cannot be reliably distinguished.'}),
+    'subgoal_complete': ('Evaluate only the explicit recovery success_condition against current and recent images.', {
+        'satisfied': 'The stated condition is visibly satisfied.',
+        'not_satisfied': 'The stated condition is visibly not satisfied.',
+        'not_applicable': 'No recovery success condition is provided.',
+        'insufficient_evidence': 'The condition cannot be reliably evaluated from the images.'}),
+}
+PROJECTIONS = {'scene_comparable': ('comparable','view_changed_comparable'),
+    'task_advancing': ('advancing',), 'stuck': ('repeated_no_effect',),
+    'grasp_failure': ('failed_attempt',), 'subgoal_complete': ('satisfied',)}
+
+
+def compiled_questions(profile):
+    result = {k: dict(type='noul', instructions=v) for k,v in question_spec(profile).items()}
+    if profile == 'task_progress':
+        result.update({k: dict(type='choice', instructions=v[0], criteria=v[1]) for k,v in CHOICES.items()})
+    return result
+
+
+class EvidenceScores(dict):
+    """Numeric compatibility view plus lossless model answers for the board."""
+    def __init__(self, values, answers):
+        super().__init__(values)
+        self.answers = deepcopy(answers)
+
+
+def question_spec(profile):
+    if profile not in ('constraints', 'task_progress'):
+        raise ValueError('Unknown observation profile')
+    return dict(QUESTIONS, **TASK_QUESTIONS) if profile == 'task_progress' else dict(QUESTIONS)
 
 
 @dataclass(frozen=True)
@@ -40,8 +128,10 @@ class MonitorConfig:
     max_gap_s: float = 120.
     max_step_gap: int = 1
     history: int = 2
+    observation_profile: str = 'constraints'
 
     def __post_init__(self):
+        question_spec(self.observation_profile)
         for value in (self.low, self.high, self.max_age_s, self.max_gap_s):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ValueError('Monitor limits must be finite numbers')
@@ -53,7 +143,9 @@ class MonitorConfig:
 
     @property
     def program_id(self):
-        spec = dict(config=asdict(self), questions=QUESTIONS, constraints=CONSTRAINTS)
+        spec = dict(config=asdict(self), questions=compiled_questions(self.observation_profile),
+                    constraints=CONSTRAINTS, input_format=VISUAL_INPUT_FORMAT,
+                    frame_fields=VISUAL_FRAME_FIELDS)
         return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:20]
 
 
@@ -83,34 +175,46 @@ class JSONEndpoint:
 
 
 class ValenMonitor(JSONEndpoint):
-    def __init__(self, url, timeout_s, *, scope='RoboDojo post-action monitoring'):
+    def __init__(self, url, timeout_s, *, scope='RoboDojo post-action monitoring', observation_profile='constraints'):
         super().__init__(url, timeout_s)
         self.scope = scope
+        self.questions = question_spec(observation_profile)
+        self.compiled = compiled_questions(observation_profile)
 
     def evaluate(self, frames):
-        # Frames are allowlisted public observations, not simulator outcome packets.
-        content = [{'type': 'text', 'text': json.dumps({'scope': self.scope,
+        # All evaluation paths share this boundary; host audit records retain controls.
+        frames = [visual_frame(frame) for frame in frames]
+        content = [{'type': 'text', 'text': json.dumps({'input_format': VISUAL_INPUT_FORMAT, 'scope': self.scope,
                     'frames': frames}, allow_nan=False)}]
         for frame in frames:
             for image in frame['images']:
                 content += [{'type': 'text', 'text': f"Step {frame['step_id']}: {image['camera']}"},
                             {'type': 'image_url', 'image_url': {'url': image['path']}}]
         raw = self.post({'state': {'messages': [{'role': 'user', 'content': content}]},
-                         'questions': {key: {'type': 'noul', 'instructions': text}
-                                       for key, text in QUESTIONS.items()}})
-        if not isinstance(raw, dict) or not isinstance(raw.get('answers'), dict) or set(raw['answers']) != set(QUESTIONS):
+                         'questions': self.compiled})
+        if not isinstance(raw, dict) or not isinstance(raw.get('answers'), dict) or set(raw['answers']) != set(self.questions):
             raise ValueError('Valen must answer every compiled question')
         values = {}
         for key, answer in raw['answers'].items():
-            if not isinstance(answer, dict) or answer.get('type', 'noul') != 'noul':
-                raise ValueError('Expected Noul evidence')
-            values[key] = answer.get('noul')
-        validate_scores(values)
-        return values
+            expected = self.compiled[key]
+            if not isinstance(answer, dict) or answer.get('type') != expected['type']:
+                raise ValueError('Unexpected Valen answer type')
+            if expected['type'] == 'choice':
+                probabilities = answer.get('probabilities')
+                if not isinstance(probabilities, dict) or set(probabilities) != set(expected['criteria']):
+                    raise ValueError('Choice probability keys must match candidates')
+                validate_scores(probabilities, expected['criteria'])
+                if not math.isclose(sum(probabilities.values()), 1., abs_tol=1e-5):
+                    raise ValueError('Choice probabilities must sum to one')
+                values[key] = min(1., sum(probabilities[k] for k in PROJECTIONS[key]))
+            else:
+                values[key] = answer.get('noul')
+        validate_scores(values, self.questions)
+        return EvidenceScores(values, raw['answers'])
 
 
-def validate_scores(values):
-    if not isinstance(values, dict) or set(values) != set(QUESTIONS):
+def validate_scores(values, questions=QUESTIONS):
+    if not isinstance(values, dict) or set(values) != set(questions):
         raise ValueError('Evidence questions do not match the compiled program')
     for value in values.values():
         if (isinstance(value, bool) or not isinstance(value, (float, int))
@@ -139,7 +243,7 @@ class ConstraintRuntime:
             raise
 
     def _update(self, frame, scores, now):
-        validate_scores(scores)
+        validate_scores(scores, question_spec(self.config.observation_profile))
         config = self.config
         identity = tuple(frame[key] for key in IDENTITY)
         if frame['program_id'] != config.program_id or (self.identity is not None and self.identity != identity):
@@ -180,12 +284,18 @@ class ConstraintRuntime:
         clear = all(c['status'] in ('clear', 'not_applicable') for c in checks)
         self.completion_count = self.completion_count + 1 if (
             clear and frame.get('success_condition') and scores['subgoal_complete'] >= config.high) else 0
+        if config.observation_profile=='task_progress':
+            statuses={'violated':'high_score_candidate','suspected':'high_score_candidate',
+                      'clear':'low_score','unknown':'unresolved_scores','not_applicable':'low_applicability_score'}
+            checks=[{**c,'status':statuses[c['status']]} for c in checks]
         return dict(**{k: frame[k] for k in IDENTITY}, step_id=step, captured_at=capture,
-                    observation_id=frame['observation_id'], gap_reset=gap, scores=scores, checks=checks,
-                    violations=violations, state='FAILED' if violations else
+                    observation_id=frame['observation_id'], gap_reset=gap, scores=dict(scores),
+                    raw_answers=deepcopy(getattr(scores, 'answers', {})), checks=checks,
+                    violations=[] if config.observation_profile=='task_progress' else violations,
+                    state='EVIDENCE' if config.observation_profile=='task_progress' else 'FAILED' if violations else
                     'UNCERTAIN' if uncertain else
                     'SUSPECTED' if any(c['status'] == 'suspected' for c in checks) else 'RUNNING',
-                    subgoal_complete=self.completion_count >= 2)
+                    subgoal_complete=config.observation_profile=='constraints' and self.completion_count >= 2)
 
 
 class PendingCall:
@@ -219,11 +329,24 @@ class PendingCall:
 
 class AsyncMonitor:
     """Single in-flight evaluation with lossless backpressure at chunk boundaries."""
-    def __init__(self, monitor, config, timeout_s):
+    def __init__(self, monitor, config, timeout_s, *, runtime_factory=ConstraintRuntime):
         self.monitor, self.config, self.timeout_s = monitor, config, timeout_s
-        self.runtime = ConstraintRuntime(config)
+        self.runtime_factory = runtime_factory
+        self.runtime = runtime_factory(config)
         self.frames = deque(maxlen=config.history)
         self.pending = None
+
+    def seed_context(self, frame):
+        """Provide a real pre-action view without contributing confirmation votes."""
+        if self.pending is not None or self.runtime.last is not None or self.frames:
+            raise ValueError('Initial context requires a fresh monitor generation')
+        if frame['program_id'] != self.config.program_id:
+            raise ValueError('Wrong context program')
+        context = deepcopy(frame)
+        context['context_only'] = True
+        for key in ('executed_actions', 'executed_start_step', 'action_source'):
+            context.pop(key, None)
+        self.frames.append(context)
 
     def submit(self, frame, *, inspection=False):
         if self.pending is not None:
@@ -236,7 +359,7 @@ class AsyncMonitor:
             # confirmation vote. Clear old counts and inspect it in isolation.
             self.runtime.invalidate()
             frames = [*deepcopy(list(self.frames)), {**deepcopy(frame), 'inspection_only': True}]
-            runtime = ConstraintRuntime(self.config)
+            runtime = self.runtime_factory(self.config)
         else:
             self.frames.append(deepcopy(frame))
             frames, runtime = deepcopy(list(self.frames)), self.runtime
@@ -263,5 +386,5 @@ class AsyncMonitor:
     def activate(self):
         if self.pending is not None:
             raise RuntimeError('Cannot activate while old evidence is in flight')
-        self.runtime = ConstraintRuntime(self.config)
+        self.runtime = self.runtime_factory(self.config)
         self.frames.clear()

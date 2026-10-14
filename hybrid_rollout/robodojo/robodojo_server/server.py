@@ -33,6 +33,7 @@ def main():
     p.add_argument('--case-file', type=Path)
     AppLauncher.add_app_launcher_args(p)
     args = p.parse_args(); args.headless = True; args.enable_cameras = True
+    args.output.mkdir(parents=True, exist_ok=True)
     from ..evaluation import read_panel, verify_assets, case_identity
     from ..io import require
     from env.global_configs import ROOT_DIR, BENCHMARK

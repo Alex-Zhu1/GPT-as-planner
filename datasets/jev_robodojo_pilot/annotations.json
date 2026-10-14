@@ -1,0 +1,293 @@
+{
+  "version": "pilot-v1",
+  "annotation_status": "model_visual_draft_pending_human_review",
+  "source_run": "robodojo-ten-pi05-only-20261013",
+  "format_reference": {
+    "url": "https://github.com/Liuziyu77/Valen/blob/main/docs/data-format.md",
+    "git_blob_sha": "ae6a98530274ff08288f3c6474d22656b7d11963",
+    "schema_git_blob_sha": "d8f94ebb3ecede125799eaceef6c4d4b4fa826d1"
+  },
+  "records": [
+    {
+      "id": "p01",
+      "case": "01-organize_table",
+      "title": "闹钟抓取进行中",
+      "times": [
+        0,
+        0.4,
+        0.8,
+        1.2,
+        1.6,
+        2
+      ],
+      "subgoal": "Place the alarm clock on the drawer.",
+      "success": "The alarm clock rests on top of the drawer unit after the gripper releases it.",
+      "state": "progressing",
+      "trigger": false,
+      "complete": false,
+      "reason": "夹爪接近并抓取闹钟；截至 2 秒还在执行动作。未到目的地不构成失败。",
+      "confidence": "high",
+      "event": null
+    },
+    {
+      "id": "p02",
+      "case": "01-organize_table",
+      "title": "闹钟放置完成，正常释放",
+      "times": [
+        1,
+        2,
+        3,
+        4,
+        4.48,
+        5
+      ],
+      "subgoal": "Place the alarm clock on the drawer.",
+      "success": "The alarm clock rests on top of the drawer unit after the gripper releases it.",
+      "state": "satisfied",
+      "trigger": false,
+      "complete": true,
+      "reason": "闹钟从桌面被搬到抽屉柜顶部；5 秒时夹爪已离开，闹钟仍有支撑。这里只判断该子目标。",
+      "confidence": "high",
+      "event": null
+    },
+    {
+      "id": "p03",
+      "case": "01-organize_table",
+      "title": "摆件释放后倾倒在桌面",
+      "times": [
+        6,
+        7,
+        8,
+        8.4,
+        8.8,
+        9.2
+      ],
+      "subgoal": "Put the figurine on the stand.",
+      "success": "The figurine is stably supported on the designated stand after release.",
+      "state": "execution_failure",
+      "trigger": true,
+      "complete": false,
+      "reason": "摆件先被夹起，释放后倾倒在桌面，未稳定放到指定支架上。标注可见的放置结果失败，不推断夹爪力或碰撞原因。",
+      "confidence": "high",
+      "event": {
+        "last_not_confirmed_s": 8.4,
+        "first_confirmed_s": 8.8,
+        "kind": "placement_topple",
+        "boundary_note": "按已检查的 0.4 秒间隔给出证据边界，不声称精确物理起始帧。"
+      }
+    },
+    {
+      "id": "p04",
+      "case": "10-put_bottles_into_dustbin",
+      "title": "瓶子抬起并开始换手",
+      "times": [
+        14,
+        14.6,
+        15,
+        15.6,
+        16,
+        17
+      ],
+      "subgoal": "Transfer the pale bottle between grippers and carry it toward a dustbin.",
+      "success": "The receiving gripper supports the bottle independently after the giving gripper withdraws, ready to carry it toward a dustbin.",
+      "state": "progressing",
+      "trigger": false,
+      "complete": false,
+      "reason": "瓶子离开桌面并随夹爪移动，另一只夹爪开始接近。换手尚未结束，此时没有足够失败证据。",
+      "confidence": "high",
+      "event": null
+    },
+    {
+      "id": "p05",
+      "case": "10-put_bottles_into_dustbin",
+      "title": "瓶子换手后失去支撑",
+      "times": [
+        16,
+        17,
+        18,
+        18.4,
+        18.6,
+        19
+      ],
+      "subgoal": "Transfer the pale bottle between grippers and carry it toward a dustbin.",
+      "success": "The receiving gripper supports the bottle independently after the giving gripper withdraws, ready to carry it toward a dustbin.",
+      "state": "execution_failure",
+      "trigger": true,
+      "complete": false,
+      "reason": "18 秒附近瓶子位于两夹爪之间；18.6 秒可见瓶子脱离两夹爪向桌面落下，19 秒仍在桌面而非被接住。",
+      "confidence": "high",
+      "event": {
+        "last_not_confirmed_s": 18.4,
+        "first_confirmed_s": 18.6,
+        "kind": "handover_loss_of_support",
+        "boundary_note": "按已检查的 0.2 秒间隔定位；25 步监测端点首次可在 19 秒看到该证据。"
+      }
+    },
+    {
+      "id": "p06",
+      "case": "10-put_bottles_into_dustbin",
+      "title": "反复夹取瓶子却未抬起",
+      "times": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        28
+      ],
+      "subgoal": "Pick up the pale bottle from the table for disposal.",
+      "success": "The bottle clears the tabletop and moves with the gripper during lifting.",
+      "state": "repeated_no_effect",
+      "trigger": true,
+      "complete": false,
+      "reason": "多次夹爪调整和夹取后，瓶子只在桌面滑动或转动，未形成稳定抬起。不是机器人完全静止，也不因最终 episode 失败而标注。",
+      "confidence": "medium",
+      "event": {
+        "last_not_confirmed_s": null,
+        "first_confirmed_s": 26,
+        "kind": "repeated_no_lift",
+        "boundary_note": "26 秒是本初稿选定的保守复查时刻；尚未精标最早可触发时刻，不作延迟评测真值。"
+      }
+    },
+    {
+      "id": "p07",
+      "case": "06-classify_objects",
+      "title": "玩偶搬运进行中",
+      "times": [
+        8,
+        8.4,
+        8.8,
+        9,
+        9.4,
+        9.6
+      ],
+      "subgoal": "Move the remaining doll into the left white basket with the other dolls.",
+      "success": "The remaining doll rests inside the left white basket after release.",
+      "state": "progressing",
+      "trigger": false,
+      "complete": false,
+      "reason": "玩偶随右侧夹爪从右侧区域向中间移动。截至 9.6 秒未见本次抓取失败，不能因尚未入篮就触发。",
+      "confidence": "medium",
+      "event": null
+    },
+    {
+      "id": "p08",
+      "case": "06-classify_objects",
+      "title": "玩偶抬起未保持，留在桌面",
+      "times": [
+        12,
+        12.4,
+        12.8,
+        13.2,
+        13.6,
+        14
+      ],
+      "subgoal": "Move the remaining doll into the left white basket with the other dolls.",
+      "success": "The remaining doll rests inside the left white basket after release.",
+      "state": "execution_failure",
+      "trigger": true,
+      "complete": false,
+      "reason": "夹爪尝试抓取并上移，玩偶未持续随之移动；随后夹爪与玩偶分离，玩偶仍在篮外桌面。仅标可见的持有失败，不区分主动松开或打滑。",
+      "confidence": "high",
+      "event": {
+        "last_not_confirmed_s": 12.8,
+        "first_confirmed_s": 13.2,
+        "kind": "failed_sustained_lift",
+        "boundary_note": "13.2 秒首次在所检查帧中确认分离；14 秒桌面状态更加明确。"
+      }
+    },
+    {
+      "id": "p09",
+      "case": "06-classify_objects",
+      "title": "重新抓取后成功入篮",
+      "times": [
+        14,
+        15,
+        16,
+        17,
+        17.6,
+        18
+      ],
+      "subgoal": "Move the remaining doll into the left white basket with the other dolls.",
+      "success": "The remaining doll rests inside the left white basket after release.",
+      "state": "satisfied",
+      "trigger": false,
+      "complete": true,
+      "reason": "玩偶重新被夹起，送入白色篮子；18 秒夹爪撤离，玩偶留在篮中。决策针对当前终点，之前的失误已经恢复，不重复触发。",
+      "confidence": "high",
+      "event": null
+    },
+    {
+      "id": "p10",
+      "case": "02-classify_objects_by_language",
+      "title": "抓取绿车后夹爪空返篮子",
+      "times": [
+        8,
+        8.4,
+        8.8,
+        9,
+        9.6,
+        10
+      ],
+      "subgoal": "Put the green car into the left basket.",
+      "success": "The green car rests inside the left basket after release.",
+      "state": "execution_failure",
+      "trigger": true,
+      "complete": false,
+      "reason": "夹爪在绿车处尝试抓取后移向左篮，但绿车仍在桌上；篮内的黄色车是另一物体。必须保持目标身份，不能把黄色车当成绿车已入篮。",
+      "confidence": "high",
+      "event": {
+        "last_not_confirmed_s": 9,
+        "first_confirmed_s": 9.6,
+        "kind": "grasp_miss_or_loss",
+        "boundary_note": "确认的是目标未被带到篮子，不区分抓空与短暂抓住后丢失。"
+      }
+    },
+    {
+      "id": "p11",
+      "case": "02-classify_objects_by_language",
+      "title": "绿车多轮抓取无效",
+      "times": [
+        8,
+        10,
+        12,
+        13,
+        15,
+        16
+      ],
+      "subgoal": "Put the green car into the left basket.",
+      "success": "The green car rests inside the left basket after release.",
+      "state": "repeated_no_effect",
+      "trigger": true,
+      "complete": false,
+      "reason": "窗口包含多轮从绿车到篮子的动作，绿车仍留在桌面。重复动作造成物体位移不等于入篮进展。",
+      "confidence": "high",
+      "event": {
+        "last_not_confirmed_s": null,
+        "first_confirmed_s": 13,
+        "kind": "repeated_unsuccessful_transport",
+        "boundary_note": "13 秒已包含第二轮尝试失败；是保守证据时刻，不是精确异常起点。"
+      }
+    },
+    {
+      "id": "p12",
+      "case": "10-put_bottles_into_dustbin",
+      "title": "仅腕部近景，换手结果证据不足",
+      "times": [
+        18
+      ],
+      "cameras": [
+        "cam_left_wrist"
+      ],
+      "subgoal": "Transfer the pale bottle between grippers and carry it toward a dustbin.",
+      "success": "The receiving gripper supports the bottle independently after the giving gripper withdraws, ready to carry it toward a dustbin.",
+      "state": "insufficient_evidence",
+      "trigger": null,
+      "complete": null,
+      "reason": "输入刻意仅保留 18 秒的左腕近景，瓶身遮挡主要视野；没有时间变化或完整双臂关系，无法判定换手完成或失败。不能借用 18.6 秒的未来画面。",
+      "confidence": "high",
+      "event": null,
+      "observation_variant": "single_wrist_single_frame_ablation"
+    }
+  ]
+}

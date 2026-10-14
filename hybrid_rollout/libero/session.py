@@ -79,7 +79,23 @@ class LiberoSession:
             if self.env.sim.data.time != before:
                 self.poisoned = True
                 raise RuntimeError('Refresh advanced simulation time')
-        return measured_observation(self.raw, self.instruction)
+        return self.measured_observation()
+
+    def measured_observation(self):
+        """Keep Pi's trained proprioception; expose the OSC site's pose separately.
+
+        Robosuite's robot0_eef_quat observes the hand body, whereas OSC controls
+        the grip site, whose orientation can differ by a fixed gripper transform.
+        """
+        observation = measured_observation(self.raw, self.instruction)
+        spec = self.eef_control()
+        if spec['supported']:
+            from scipy.spatial.transform import Rotation
+            site = spec['eef_site']
+            observation['eef_position'] = np.asarray(self.env.sim.data.get_site_xpos(site)).copy()
+            observation['eef_quaternion_xyzw'] = Rotation.from_matrix(
+                self.env.sim.data.get_site_xmat(site)).as_quat()
+        return observation
 
     def execute(self, actions):
         self._owner()
@@ -99,6 +115,61 @@ class LiberoSession:
         except BaseException:
             self.poisoned = True  # Never retry an action with uncertain execution.
             raise
+        return np.asarray(trace)
+
+    def eef_control(self):
+        from .eef import controller_spec
+        self._owner()
+        try:
+            robots = getattr(self.env, 'robots', None)
+            if robots is None:
+                robots = self.env.env.robots
+            if len(robots) != 1:
+                raise ValueError('EEF requires a single robot')
+            return controller_spec(robots[0].controller)
+        except (AttributeError, ValueError) as error:
+            return dict(supported=False, reason=str(error))
+
+    def execute_eef(self, target, proposal, steps, reference):
+        from scipy.spatial.transform import Rotation
+        from .eef import pose, target_action, validate_target
+        self._owner()
+        spec = self.eef_control()
+        validate_target(target, reference, spec)
+        values = action_chunk(proposal)
+        if type(steps) is not int or not 1 <= steps <= min(5, len(values)):
+            raise ValueError('EEF execution must select 1..5 proposal controls')
+        trace, self.eef_trace = [], []
+        for index in range(steps):
+            # Same site read by OSC.update(); no sim.step/forward or privileged objects.
+            site = spec['eef_site']
+            current = dict(frame='MuJoCo world',
+                position=np.asarray(self.env.sim.data.get_site_xpos(site)).tolist(),
+                quaternion_xyzw=Rotation.from_matrix(
+                    self.env.sim.data.get_site_xmat(site)).as_quat().tolist())
+            p, r = pose(current)
+            p0, r0 = pose(reference)
+            if index == 0 and (np.linalg.norm(p-p0) > 1e-4 or (r*r0.inv()).magnitude() > 1e-4):
+                raise ValueError('EEF observation does not match the live controller site')
+            if np.linalg.norm(p-p0) > .05+1e-9 or (r*r0.inv()).magnitude() > .35+1e-9:
+                raise ValueError('EEF measured motion exceeded the correction envelope')
+            action = target_action(target, current, spec, values[index, 6])
+            executed = self.execute(np.asarray([action]))
+            trace.extend(executed)
+            record = dict(step_id=self.tick, target=target, measured_before=current,
+                          executed_action=executed[0].tolist())
+            self.eef_trace.append(record)
+            record['measured_after'] = dict(
+                position=np.asarray(self.env.sim.data.get_site_xpos(site)).tolist(),
+                quaternion_xyzw=Rotation.from_matrix(self.env.sim.data.get_site_xmat(site)).as_quat().tolist(),
+                frame='MuJoCo world')
+            # Check the last step too: a bounded target does not guarantee that
+            # the physical plant stayed inside the correction envelope.
+            p_after, r_after = pose(record['measured_after'])
+            if np.linalg.norm(p_after-p0) > .05+1e-9 or (r_after*r0.inv()).magnitude() > .35+1e-9:
+                raise ValueError('EEF measured motion exceeded the correction envelope after execution')
+            if self.terminal:
+                break
         return np.asarray(trace)
 
     def close(self):

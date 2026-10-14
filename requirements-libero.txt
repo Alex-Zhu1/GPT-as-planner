@@ -13,6 +13,7 @@ robosuite==1.4.1
 mujoco==2.3.7
 robomimic==0.2.0
 bddl==1.0.1
+future>=1.0,<2
 gym==0.25.2
 easydict>=1.9,<2
 cloudpickle>=2.1,<4

@@ -1,0 +1,18 @@
+{
+  "records": 12,
+  "groups": 4,
+  "labelled_questions": 34,
+  "review_labels": {
+    "False": 5,
+    "True": 6,
+    "unlabeled": 1
+  },
+  "official_valen_read_jsonl": "passed",
+  "schema_git_blob_sha_verified": "d8f94ebb3ecede125799eaceef6c4d4b4fa826d1",
+  "image_sha256_and_native_pixel_equality_checked": 180,
+  "clips_with_exact_frame_counts": 11,
+  "html_local_links": "passed",
+  "future_frames_in_model_inputs": 0,
+  "model_processor_compile_tested": false,
+  "annotation_human_reviewed": false
+}

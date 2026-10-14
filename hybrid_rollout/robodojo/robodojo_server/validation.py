@@ -41,7 +41,9 @@ def validate_response(response, request):
     if mode == 'stop':
         return
     n = response.get('steps')
-    cap = 15 if mode == 'student' else 5
+    cap = request.get('student_step_limit', 15) if mode == 'student' else 5
+    if type(cap) is not int or not 1 <= cap <= 25:
+        raise ValueError('Invalid host student execution limit')
     if type(n) is not int or not 1 <= n <= cap:
         raise ValueError(f'Expected 1..{cap} execution steps')
     if mode == 'edit':

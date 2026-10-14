@@ -40,9 +40,13 @@ def main(argv=None):
     p.add_argument('--student-port', type=int, default=18830)
     p.add_argument('--valen-url', required=True)
     p.add_argument('--planner-url', required=True, help='HTTP endpoint implementing the versioned recovery contract')
-    p.add_argument('--max-decisions', type=int, default=10, help='Zero runs until native suite horizon')
+    p.add_argument('--max-decisions', type=int, default=0, help='Zero runs until native suite horizon')
     p.add_argument('--chunk-steps', type=int, choices=range(1, 6), default=1)
     p.add_argument('--max-replans', type=int, default=3)
+    p.add_argument('--uncertainty-policy', choices=('pause', 'continue'), default='continue',
+                   help='LIBERO simulation: continue bounded student chunks on valid unknown evidence')
+    p.add_argument('--max-uncertainty-reviews', type=int, choices=range(51), default=0,
+                   help='Opt-in Astra review of unresolved uncertainty; only one student control or stop')
     p.add_argument('--max-observation-refreshes', type=int, choices=range(4), default=1)
     p.add_argument('--policy-timeout', type=float, default=120.)
     p.add_argument('--monitor-timeout', type=float, default=120.)
@@ -64,7 +68,9 @@ def main(argv=None):
     planner = HTTPPlanner(a.planner_url, a.planner_timeout)
     scheduler = ReplanScheduler(None, monitor, planner, chunk_steps=a.chunk_steps,
         max_replans=a.max_replans, policy_timeout=a.policy_timeout, planner_timeout=a.planner_timeout,
-        max_observation_refreshes=a.max_observation_refreshes)
+        max_observation_refreshes=a.max_observation_refreshes,
+        max_uncertainty_reviews=a.max_uncertainty_reviews, include_initial_context=True,
+        uncertainty_policy=a.uncertainty_policy)
     output = a.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     student = rollout = None
