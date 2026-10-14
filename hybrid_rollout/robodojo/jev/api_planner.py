@@ -12,7 +12,7 @@ from .compact_planner import compact_packet, compact_instructions, recovery_outp
 from .monitor import IDENTITY
 from .plans import validate_decision
 from .task_instructions import validate_replan
-from .subgoal_plan import is_subgoal_request, validate_planning_payload, PLAN_VERSION
+from .subgoal_plan import is_subgoal_request, validate_planning_payload, PLAN_VERSION, PlanningFormatError
 
 MODEL, EFFORT = 'gpt-6-astra', 'high'
 DEFAULT_BASE_URL = 'http://127.0.0.1:8317/v1'
@@ -81,8 +81,8 @@ class CompactAPIPlanner:
         body = dict(model=MODEL, reasoning=dict(effort=EFFORT), instructions=instructions,
                     tools=[], store=False, stream=False, input=[dict(role='user', content=content)],
                     text=dict(format=dict(type='json_schema', name='robodojo_review', strict=True, schema=schema)))
-        # Match compact's one-call-per-review policy; even a failed request ID
-        # cannot silently trigger another inference. No conversation is replayed.
+        # One inference per request ID. The scheduler owns bounded format repair
+        # with a new ID and explicit feedback; transport failures are not retried.
         name = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         directory = self.output/f'astra_api_{name}'
         directory.mkdir(parents=True)
@@ -94,7 +94,7 @@ class CompactAPIPlanner:
             action_chunk_mode='none' if is_subgoal_request(request) else self.action_chunk_mode,
             action_chunk_steps=None if is_subgoal_request(request) else self.action_chunk_steps,
             action_chunk_points=len(packet.get('proposal', {}).get('sampled_fk', [])),
-            output_format='subgoal_plan_v4' if is_subgoal_request(request) else self.output_format)
+            output_format='subgoal_plan_v5' if is_subgoal_request(request) else self.output_format)
         write_json(directory/'request.json', request)
         write_json(directory/'input.json', packet)
         write_json(directory/'images.json', images)
@@ -106,7 +106,13 @@ class CompactAPIPlanner:
             result = (self.client(body, diagnostic_path=directory/'client_events.jsonl')
                       if isinstance(self.client, ResponsesClient) else self.client(body))
             write_json(directory/'api_response.json', result)
-            decision = validated_payload(structured_payload(result, MODEL), request)
+            try:
+                payload = structured_payload(result, MODEL, require_object=not is_subgoal_request(request))
+            except json.JSONDecodeError as error:
+                if is_subgoal_request(request):
+                    raise PlanningFormatError('Return valid JSON for the goal-board schema', str(error)) from error
+                raise
+            decision = validated_payload(payload, request)
             if self.closed:
                 raise RuntimeError('Planner closed while API request was in flight; discard result')
             response = dict(identity, decision=deepcopy(decision))

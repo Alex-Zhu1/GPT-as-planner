@@ -146,7 +146,7 @@ python -m hybrid_rollout.robodojo.jev.run \
 ```
 
 Replace `--codex ...` with `--planner-url http://127.0.0.1:8003/replan` when using
-your external Planner implementing the version-4 subgoal-plan envelope. The Valen
+your external Planner implementing the version-5 subgoal-plan envelope. The Valen
 server must support choice questions and return every candidate probability.
 Use `--monitor-policy temporal` for the previous background-recovery protocol.
 Model calls may incur charges.

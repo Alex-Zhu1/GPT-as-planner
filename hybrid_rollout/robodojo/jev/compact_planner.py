@@ -254,7 +254,14 @@ class CompactCodexPlanner:
                 if p['turn']['status'] != 'completed':
                     raise RuntimeError('Astra structured turn failed: '+str(p['turn'].get('error')))
                 break
-        decision = json.loads(final) if final else None
+        (directory/'model_output.txt').write_text(final or '')
+        try:
+            decision = json.loads(final) if final else None
+        except json.JSONDecodeError as error:
+            if is_subgoal_request(request):
+                from .subgoal_plan import PlanningFormatError
+                raise PlanningFormatError('Return valid JSON for the goal-board schema', final) from error
+            raise
         if is_subgoal_request(request):
             decision = validate_planning_payload(decision, request)
         elif not background and isinstance(decision, dict):
@@ -270,7 +277,7 @@ class CompactCodexPlanner:
             action_chunk_mode='none' if is_subgoal_request(request) else self.action_chunk_mode,
             action_chunk_steps=None if is_subgoal_request(request) else self.action_chunk_steps,
             action_chunk_points=len(packet.get('proposal', {}).get('sampled_fk', [])),
-            output_format='subgoal_plan_v4' if is_subgoal_request(request) else self.output_format,
+            output_format='subgoal_plan_v5' if is_subgoal_request(request) else self.output_format,
             local_prepare_seconds=prepared-prepare_started,
             connect_seconds=connected-prepared, thread_start_seconds=thread_ready-started,
             turn_submit_seconds=turn_ready-thread_ready,

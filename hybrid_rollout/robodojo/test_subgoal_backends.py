@@ -17,8 +17,8 @@ def test_transports_share_planning_prompt_schema_and_validate_before_reply(tmp_p
     req = source(tmp_path)
     req.update(request())
     rows = req['remaining_requirements']
-    answer = dict(mode='plan', reason='Three source-language stages.', assessments=[], subgoals=[
-        goal_for(rows[:2],'g1'), goal_for(rows[2:4],'g2'), goal_for(rows[4:],'g3')])
+    answer = dict(mode='plan', reason='Atomic goal board.', assessments=[],
+                  subgoals=[goal_for([r]) for r in rows])
     if invalid: answer['subgoals'].pop()
     sent={}
     planner=planner_for(backend,tmp_path/'audit',answer,sent)
@@ -35,12 +35,12 @@ def test_transports_share_planning_prompt_schema_and_validate_before_reply(tmp_p
         else:
             prompt=sent['thread/start']['developerInstructions'];schema=sent['turn/start']['outputSchema']
             packet=json.loads(sent['turn/start']['input'][0]['text'])
-        assert 'ONE TO THREE' in prompt and 'Do not use tools' in prompt
+        assert 'Stable goal board' in prompt and 'Do not use tools' in prompt
         assert 'proposal' not in packet and 'native_request' not in packet
         assert packet['remaining_requirements']==rows
-        assert packet['pi_instruction_contract']['max_words_per_requirement']==24
+        assert packet['pi_instruction_contract']['max_words']==24
         assert schema['properties']['decision']['properties']['mode']['enum']==['plan']
-        assert schema['properties']['decision']['properties']['subgoals']['maxItems']==3
+        assert schema['properties']['decision']['properties']['subgoals']['maxItems']==len(rows)
         assert json.loads(next((tmp_path/'audit').glob('astra*/schema.json')).read_text())==schema
     finally: planner.close()
 
@@ -75,9 +75,9 @@ def test_valen_receives_plan_context_references_and_choice_candidates_without_hi
 @pytest.mark.parametrize('mode',['advance','plan'])
 def test_transports_support_astra_completion_and_repair_assessments(tmp_path,backend,mode):
     req=source(tmp_path);req.update(request())
-    req.update(review_kind='subgoal_review',remaining_plan=plan_response(req,[2,2,3])['decision']['subgoals'])
+    req.update(review_kind='subgoal_review',remaining_plan=plan_response(req)['decision']['subgoals'])
     answer=plan_response(req,mode=mode)['decision']
-    if mode=='plan':answer['subgoals'][0]['instruction']='Pick up the fallen figurine and place it upright on the stand. Finish the remaining placements and reset the robot arm.'
+    if mode=='plan':answer['subgoals'][2]['instruction']='Pick up the fallen figurine and put it upright on the stand.'
     sent={}
     planner=planner_for(backend,tmp_path/'audit',answer,sent)
     try:
@@ -91,16 +91,17 @@ def test_transports_support_astra_completion_and_repair_assessments(tmp_path,bac
 @pytest.mark.parametrize('backend',['compact','api'])
 def test_transports_deliver_wording_history_and_reject_pi_preservation_suffix(tmp_path,backend):
     req=source(tmp_path);req.update(request())
-    req.update(review_kind='progress_review',remaining_plan=plan_response(req,[2,2,3])['decision']['subgoals'],
-               instruction_history=[dict(instruction='Put the figurine on the stand.',executed_controls=300)])
+    req.update(review_kind='progress_review',remaining_plan=plan_response(req)['decision']['subgoals'],
+               instruction_history=[dict(instruction='Put the figurine on the stand.',
+                   requirements=['figurine-on-stand'],executed_controls=300,start_step=0,end_step=300)])
     answer=plan_response(req)['decision']
     answer['subgoals'][0]['instruction']='Put the figurine upright without disturbing the clock.'
     sent={};planner=planner_for(backend,tmp_path/'audit',answer,sent)
     try:
-        with pytest.raises(ValueError,match='preservation commentary'):planner.replan(req)
+        with pytest.raises(ValueError,match='instruction_options'):planner.replan(req)
         packet=json.loads(sent['input'][0]['content'][0]['text'] if backend=='api' else sent['turn/start']['input'][0]['text'])
         assert packet['instruction_history']==req['instruction_history']
-        assert packet['pi_instruction_contract']['max_sentences_per_requirement']==1
+        assert packet['pi_instruction_contract']['max_sentences']==1
         assert not list((tmp_path/'audit').glob('astra*/response.json'))
     finally:planner.close()
 
@@ -131,3 +132,45 @@ def test_inapplicable_mode_options_are_rejected(tmp_path,flags):
     from .test_api_planner import cli_args
     with pytest.raises(SystemExit):main(cli_args(tmp_path)+['--codex','/fake/codex',*flags])
     assert not (tmp_path/'run').exists()
+
+
+@pytest.mark.parametrize('backend',['compact','api'])
+@pytest.mark.parametrize('text',['{bad json','[]'])
+def test_malformed_model_content_is_repairable_in_both_transports(tmp_path,backend,text):
+    from .jev.subgoal_plan import PlanningFormatError
+    req=source(tmp_path);req.update(request())
+    planner=planner_for(backend,tmp_path/'audit',plan_response(req)['decision'],{})
+    if backend=='api':
+        from .test_api_planner import result
+        def malformed(body):
+            answer=result({});answer['output'][0]['content'][0]['text']=text;return answer
+        planner.client=malformed
+    else:
+        original=planner.factory
+        def factory(*args):
+            transport=original(*args);receive=transport.next_message
+            def next_message(timeout):
+                message=receive(timeout)
+                if message['method']=='item/completed':message['params']['item']['text']=text
+                return message
+            transport.next_message=next_message
+            return transport
+        planner.factory=factory
+    try:
+        with pytest.raises(PlanningFormatError):planner.replan(req)
+        assert not list((tmp_path/'audit').glob('astra*/response.json'))
+    finally:planner.close()
+
+
+def test_wrong_api_model_is_not_repairable(tmp_path):
+    from .jev.subgoal_plan import PlanningFormatError
+    from .test_api_planner import result
+    req=source(tmp_path);req.update(request())
+    planner=planner_for('api',tmp_path/'audit',{}, {})
+    def wrong(body):
+        answer=result({});answer['model']='other-model';return answer
+    planner.client=wrong
+    try:
+        with pytest.raises(ValueError) as caught:planner.replan(req)
+        assert not isinstance(caught.value,PlanningFormatError)
+    finally:planner.close()

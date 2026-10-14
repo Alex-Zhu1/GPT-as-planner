@@ -18,8 +18,8 @@ def choice(instructions, **criteria):
 
 def subgoal_questions(frame):
     goals = frame['plan_goals']
-    if not 1 <= len(goals) <= 3 or frame['subgoal_id'] not in [g['subgoal_id'] for g in goals]:
-        raise ValueError('Monitoring requires one to three goals and an active goal')
+    if not goals or frame['subgoal_id'] not in [g['subgoal_id'] for g in goals]:
+        raise ValueError('Monitoring requires a goal board and an active goal')
     active = next(g for g in goals if g['subgoal_id'] == frame['subgoal_id'])
     result = dict(
         observability=choice('Are task-relevant objects visible enough to detect execution anomalies?',
@@ -131,7 +131,7 @@ class SubgoalMonitorConfig:
     def program_id(self):
         spec = dict(config=asdict(self), questions=subgoal_questions(dict(plan_goals=[dict(
             subgoal_id='g1', instruction='Active source instruction')], subgoal_id='g1')),
-            input_format='robodojo_anomaly_evidence_v2', revision=2)
+            input_format='robodojo_anomaly_evidence_v2', revision=3)
         return hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:20]
 
 

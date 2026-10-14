@@ -1,4 +1,4 @@
-"""Versioned language plans shared by the controller, compact and API transports."""
+"""Version-5 atomic goal board and validated short language choices."""
 from copy import deepcopy
 from pathlib import Path
 import re
@@ -6,33 +6,56 @@ import re
 from .monitor import IDENTITY, visual_frame
 from .task_instructions import ORGANIZE_TABLE, replan_candidates
 
-
-PLAN_VERSION = 4
+PLAN_VERSION = 5
 PLANNER_ROLE = 'robodojo_subgoal_planner'
 PROMPT_PATH = Path(__file__).with_name('subgoal_planner.md')
-PI_INSTRUCTION_CONTRACT = dict(
-    max_words_per_requirement=24, max_characters_per_requirement=160,
-    max_sentences_per_requirement=1, max_characters=600,
-    style='Short action, target and destination; necessary orientation only. '
-          'Keep verification and preservation commentary in completion_checks, reason and evidence.')
-_EXTRA_COMMENTARY = re.compile(
-    r'\b(?:make sure|ensure|verify|check that|remain(?:s)? stable|stable and supported|'
-    r'without (?:disturbing|disrupting|moving|touching)|'
-    r'(?:do not|don\x27t|avoid) (?:disturb|disturbing|disrupt|disrupting))\b', re.I)
+PI_INSTRUCTION_CONTRACT = dict(max_words=24, max_characters=160, max_sentences=1,
+    selection='Choose an exact instruction_options entry for one goal; never append clauses.')
+MAX_EVIDENCE_FRAMES = 8
+MAX_FORMAT_REPAIRS = 2
+DISPATCH_POLICY = dict(version=1, board_order='Stable requirement order, not execution order.',
+    selection='Astra selects the first plan card; unfinished independent goals may be deferred.',
+    ineffective='Yield to an unserved independent goal, otherwise the least recently served alternative.',
+    retry='Change the last ineffective executed wording when alternatives exist; deferred wording may stay unchanged.')
+
+class PlanningFormatError(ValueError):
+    """A model answer can be corrected at the same paused scene; transport faults cannot."""
+    def __init__(self, message, rejected=None):
+        super().__init__(message)
+        self.rejected = deepcopy(rejected)
 
 
-def validate_pi_instruction(instruction, requirement_count):
-    """Reject verbose model text; never silently truncate or rewrite Pi input."""
-    limits = PI_INSTRUCTION_CONTRACT
+def validate_pi_instruction(instruction, requirement_count=1):
+    if requirement_count != 1:
+        raise ValueError('Pi executes exactly one atomic goal, never grouped requirements')
     if not isinstance(instruction, str) or not instruction.strip():
         raise ValueError('Pi instruction must be nonempty short action language')
-    sentences = [part for part in re.split(r'[.!?;]+', instruction) if part.strip()]
-    if (len(instruction) > min(limits['max_characters'], limits['max_characters_per_requirement'] * requirement_count)
-            or len(instruction.split()) > limits['max_words_per_requirement'] * requirement_count
-            or len(sentences) > limits['max_sentences_per_requirement'] * requirement_count):
-        raise ValueError('Pi instruction must use at most 24 words, 160 characters and one sentence per requirement')
-    if _EXTRA_COMMENTARY.search(instruction):
-        raise ValueError('Keep verification and preservation commentary out of the Pi instruction')
+    if (len(instruction) > 160 or len(instruction.split()) > 24
+            or len([p for p in re.split(r'[.!?;]+', instruction) if p.strip()]) != 1):
+        raise ValueError('Pi instruction must use at most 24 words, 160 characters and one sentence total')
+
+
+# Host-owned public language choices. These are not observations or claims that
+# a recovery has been learned by Pi. Astra chooses and changes wording, not truth.
+_PLACEMENT_OPTIONS = {
+    'mouse-on-pad': ['Place the mouse on the mouse pad.',
+        'Pick up the mouse and put it on the mouse pad.', 'Move the mouse onto the mouse pad.'],
+    'keyboard-in-frame': ['Push the keyboard into the frame.',
+        'Place the keyboard face up inside the marked frame.', 'Move the keyboard into the marked frame.'],
+    'figurine-on-stand': ['Put the figurine upright on the stand.',
+        'Pick up the fallen figurine and put it upright on the stand.',
+        'Lift the fallen figurine onto the stand with its base down.',
+        'Stand the figurine upright on its base on the stand.'],
+    'clock-on-drawer': ['Place the alarm clock upright on the drawer.',
+        'Pick up the alarm clock and put it upright on the drawer cabinet.',
+        'Stand the alarm clock upright on top of the drawer.'],
+    'reset-arm': ['Reset both robot arms.', 'Release the objects and return both arms to their starting poses.'],
+}
+
+
+def instruction_options(row):
+    options = _PLACEMENT_OPTIONS.get(row['requirement_id'], [row['instruction']])
+    return list(options)
 
 
 def is_subgoal_request(request):
@@ -76,12 +99,12 @@ def task_requirements(instruction, context):
     return result
 
 
-def goal_for(requirements, identifier):
-    """Compose reviewed clauses without adding model-authored motion instructions."""
-    return dict(subgoal_id=identifier,
-        instruction=' '.join(row['instruction'] for row in requirements),
-        requirements=[row['requirement_id'] for row in requirements],
-        completion_checks=[row['completion_check'] for row in requirements])
+def goal_for(requirements, identifier=None):
+    if len(requirements) != 1:
+        raise ValueError('One board goal per requirement; grouped instructions are not supported')
+    row = requirements[0]
+    return dict(subgoal_id=row['requirement_id'], instruction=instruction_options(row)[0],
+                requirements=[row['requirement_id']], completion_checks=[row['completion_check']])
 
 
 def _object(properties):
@@ -90,115 +113,188 @@ def _object(properties):
 
 def planning_schema(request):
     rows = request['all_requirements']
+    for row in rows:
+        for text in instruction_options(row):
+            validate_pi_instruction(text)
     initial = request['review_kind'] == 'initial_plan'
-    modes = ['plan'] if initial else ['plan', 'keep_plan', 'advance']
-    goal = _object(dict(subgoal_id=dict(type='string', enum=['g1', 'g2', 'g3']),
-        instruction=dict(type='string', minLength=1, maxLength=PI_INSTRUCTION_CONTRACT['max_characters'],
-            description='At most 24 words, 160 characters and one sentence per covered requirement. '
-                        'Action/target/destination only; no verification or preservation commentary.'),
-        requirements=dict(type='array', minItems=1, maxItems=len(rows),
-            items=dict(type='string', enum=[r['requirement_id'] for r in rows])),
-        completion_checks=dict(type='array', minItems=1, maxItems=len(rows),
-            items=dict(type='string', enum=[r['completion_check'] for r in rows]))))
+    # Bind a goal's instruction, ID and immutable completion check together.
+    goal = dict(anyOf=[_object(dict(
+        subgoal_id=dict(type='string', enum=[row['requirement_id']]),
+        instruction=dict(type='string', enum=instruction_options(row)),
+        requirements=dict(type='array', minItems=1, maxItems=1,
+                          items=dict(type='string', enum=[row['requirement_id']])),
+        completion_checks=dict(type='array', minItems=1, maxItems=1,
+                               items=dict(type='string', enum=[row['completion_check']])))) for row in rows])
     return _object(dict(decision=_object(dict(
-        mode=dict(type='string', enum=modes),
+        mode=dict(type='string', enum=['plan'] if initial else ['plan', 'keep_plan', 'advance']),
         reason=dict(type='string', minLength=1, maxLength=1200),
         assessments=dict(type='array', minItems=0 if initial else len(rows), maxItems=0 if initial else len(rows),
             items=_object(dict(requirement_id=dict(type='string', enum=[r['requirement_id'] for r in rows]),
                 status=dict(type='string', enum=['satisfied', 'pending', 'uncertain']),
+                execution=dict(type='string', enum=['not_attempted', 'progressing', 'ineffective', 'uncertain', 'complete']),
                 evidence=dict(type='string', minLength=1, maxLength=600)))),
-        subgoals=dict(type='array', minItems=1 if initial else 0, maxItems=3, items=goal)))))
+        subgoals=dict(type='array', minItems=1 if initial else 0, maxItems=len(rows), items=goal)))))
 
 
-def validate_planning_decision(decision, request):
-    if not is_subgoal_request(request) or request.get('version') != PLAN_VERSION:
-        raise ValueError('Expected the version-4 subgoal planning protocol')
+def dispatch_candidates(request, satisfied):
+    """Fair alternatives after an ineffective attempt; never infer physical failure."""
+    current = request.get('remaining_plan', [])
+    if not current or request.get('task_context', {}).get('ordered_requirements', True):
+        return []
+    candidates = [r['requirement_id'] for r in request['all_requirements']
+                  if r['requirement_id'] not in {*satisfied, current[0]['subgoal_id'], 'reset-arm'}]
+    history = request.get('instruction_history', [])
+    last_served = {key: max((h['end_step'] for h in history
+                            if key in h['requirements'] and h['executed_controls'] > 0), default=-1)
+                   for key in candidates}
+    oldest = min(last_served.values(), default=-1)
+    return [key for key in candidates if last_served[key] == oldest]
+
+
+def _validate_decision(decision, request):
     if not isinstance(decision, dict) or set(decision) != {'mode', 'reason', 'assessments', 'subgoals'}:
-        raise ValueError('Planner returns language goals and requirement assessments; no robot actions')
-    reason = decision['reason']
-    if not isinstance(reason, str) or not reason.strip() or len(reason) > 1200:
+        raise ValueError('Return mode, reason, assessments and atomic subgoals; no robot actions')
+    if not isinstance(decision['reason'], str) or not 0 < len(decision['reason'].strip()) <= 1200:
         raise ValueError('A bounded planning reason is required')
     initial = request['review_kind'] == 'initial_plan'
     rows, assessments = request['all_requirements'], decision['assessments']
     if not isinstance(assessments, list) or len(assessments) != (0 if initial else len(rows)):
         raise ValueError('A review must assess every original requirement')
-    satisfied = set()
+    satisfied, ineffective = set(), set()
     for row, assessment in zip(rows, assessments):
-        if (not isinstance(assessment, dict) or set(assessment) != {'requirement_id', 'status', 'evidence'}
+        if (not isinstance(assessment, dict) or set(assessment) != {'requirement_id', 'status', 'execution', 'evidence'}
                 or assessment['requirement_id'] != row['requirement_id']
                 or assessment['status'] not in ('satisfied', 'pending', 'uncertain')
+                or assessment['execution'] not in ('not_attempted', 'progressing', 'ineffective', 'uncertain', 'complete')
                 or not isinstance(assessment['evidence'], str) or not 0 < len(assessment['evidence'].strip()) <= 600):
-            raise ValueError('Each ordered requirement assessment needs a status and visual evidence')
+            raise ValueError('Each board assessment needs an ordered ID, status, execution feedback and evidence')
+        if (assessment['status'] == 'satisfied') != (assessment['execution'] == 'complete'):
+            raise ValueError('Only satisfied requirements have complete execution feedback')
+        if assessment['execution'] == 'ineffective':
+            if assessment['status'] != 'pending':
+                raise ValueError('Confirmed ineffective attempts must be pending, not uncertain')
+            ineffective.add(row['requirement_id'])
         if assessment['status'] == 'satisfied': satisfied.add(row['requirement_id'])
     needed = [r['requirement_id'] for r in rows if r['requirement_id'] not in satisfied]
     if 'reset-arm' in satisfied and needed:
         raise ValueError('Arm return cannot be completed while other work remains')
     goals, mode = decision['subgoals'], decision['mode']
+    current = request.get('remaining_plan', [])
+    by_id = {r['requirement_id']: r for r in rows}
+    # Also validate retained queues: no legacy grouped or unchecked instruction
+    # can bypass the contract through keep_plan/advance.
+    for goal in current:
+        _validate_goal(goal, by_id)
+    active = current[0]['subgoal_id'] if current else None
+    executed = request.get('execution_budget', {}).get('stage_executed_controls', 0) > 0
+    yield_to = dispatch_candidates(request, satisfied) if active in ineffective and executed else []
+    # Only actual Pi execution can associate a failed attempt with its wording.
+    # Incidental manipulation of another object does not invalidate an untried card.
+    failed_wording = {}
+    for attempt in request.get('instruction_history', []):
+        if attempt['executed_controls'] > 0:
+            for key in attempt['requirements']:
+                failed_wording.pop(key, None)
+                reviews = attempt.get('reviews', [])
+                if reviews and reviews[-1]['execution'] == 'ineffective':
+                    failed_wording[key] = attempt['instruction']
+    if active in ineffective and executed:
+        failed_wording[active] = current[0]['instruction']
+
+    def validate_selection(goal):
+        key = goal['subgoal_id']
+        if yield_to and key not in yield_to:
+            raise ValueError(f'Ineffective active goal must yield: return plan selecting one of {yield_to}; retain deferred unfinished cards')
+        if (len(instruction_options(by_id[key])) > 1
+                and goal['instruction'] == failed_wording.get(key)):
+            raise ValueError('Change the short description before retrying its ineffective executed instruction')
     if mode in ('keep_plan', 'advance'):
-        if initial or goals != [] or not request.get('remaining_plan'):
-            raise ValueError('keep_plan/advance require an existing plan')
+        if initial or goals != [] or not current:
+            raise ValueError('keep_plan/advance require an existing board queue')
         if request['execution_budget']['stage_executed_controls'] <= 0:
             raise ValueError('A stage decision needs executed evidence')
-        queued = {r for g in request['remaining_plan'] for r in g['requirements']}
-        if not set(needed) <= queued:
+        if not set(needed) <= {g['subgoal_id'] for g in current}:
             raise ValueError('A reopened requirement needs a replacement plan')
-        done = set(request['remaining_plan'][0]['requirements']) <= satisfied
+        done = current[0]['subgoal_id'] in satisfied
         if (mode == 'advance') != done:
-            raise ValueError('Only Astra evidence satisfying every current-stage check permits advance')
+            raise ValueError('Only Astra evidence satisfying the current goal permits advance')
+        remaining = [g for g in current if g['subgoal_id'] not in satisfied]
+        if remaining:
+            validate_selection(remaining[0])
         return
-    if mode != 'plan' or not isinstance(goals, list) or not 1 <= len(goals) <= 3:
-        raise ValueError('Astra must plan one to three ordered subgoals')
-    by_id = {r['requirement_id']: r for r in rows}
-    covered = []
-    for index, goal in enumerate(goals, 1):
-        if not isinstance(goal, dict) or set(goal) != {'subgoal_id', 'instruction', 'requirements', 'completion_checks'}:
-            raise ValueError('Each subgoal needs exact instruction, requirement coverage and completion checks')
-        coverage = goal['requirements']
-        if not isinstance(coverage, list) or not coverage or any(not isinstance(r, str) or r not in by_id for r in coverage):
-            raise ValueError('Empty subgoal coverage')
-        if (goal['subgoal_id'] != f'g{index}' or not isinstance(goal['instruction'], str)
-                or not 0 < len(goal['instruction'].strip()) <= 600
-                or goal['completion_checks'] != [by_id[r]['completion_check'] for r in coverage]):
-            raise ValueError('Subgoals require bounded language and exact requirement completion checks')
-        validate_pi_instruction(goal['instruction'], len(coverage))
-        covered.extend(coverage)
+    if mode != 'plan' or not isinstance(goals, list) or not 1 <= len(goals) <= len(rows):
+        raise ValueError('Plan one atomic board card per unfinished requirement')
+    for goal in goals:
+        _validate_goal(goal, by_id)
+    covered = [g['subgoal_id'] for g in goals]
     if len(set(covered)) != len(covered) or set(covered) != set(needed):
         raise ValueError('Plan omitted or duplicated unfinished original-task requirements')
     if request.get('task_context', {}).get('ordered_requirements', True) and covered != needed:
         raise ValueError('This task requires source requirement order')
     if 'reset-arm' in covered and covered[-1] != 'reset-arm':
         raise ValueError('Arm return must remain last')
+    validate_selection(goals[0])
+
+
+def _validate_goal(goal, by_id):
+    if not isinstance(goal, dict) or set(goal) != {'subgoal_id', 'instruction', 'requirements', 'completion_checks'}:
+        raise ValueError('Each goal needs its stable ID, instruction, requirement and completion check')
+    identifier = goal['subgoal_id']
+    if not isinstance(identifier, str) or identifier not in by_id:
+        raise ValueError('Goal ID must be an original requirement ID')
+    row = by_id[identifier]
+    if goal['requirements'] != [identifier] or goal['completion_checks'] != [row['completion_check']]:
+        raise ValueError('Atomic goal coverage and completion check must match its stable ID')
+    validate_pi_instruction(goal['instruction'])
+    if goal['instruction'] not in instruction_options(row):
+        raise ValueError('Choose an exact instruction_options entry for this goal; appended or unrelated clauses are forbidden')
+
+
+def validate_planning_decision(decision, request):
+    if not is_subgoal_request(request) or request.get('version') != PLAN_VERSION:
+        raise ValueError('Expected the version-5 goal-board protocol')
+    try:
+        _validate_decision(decision, request)
+    except (ValueError, TypeError, KeyError) as error:
+        raise PlanningFormatError(str(error), decision) from error
 
 
 def validate_planning_response(response, request):
     if not isinstance(response, dict) or set(response) != {'request_id', *IDENTITY, 'decision'}:
-        raise ValueError('Invalid subgoal plan response envelope')
+        raise ValueError('Invalid goal-board response envelope')
     for key in ('request_id', *IDENTITY):
         if type(response[key]) is not type(request[key]) or response[key] != request[key]:
-            raise ValueError('Stale subgoal plan identity')
+            raise ValueError('Stale goal-board response identity')
     validate_planning_decision(response['decision'], request)
     return deepcopy(response['decision'])
 
 
 def validate_planning_payload(payload, request):
     if not isinstance(payload, dict) or set(payload) != {'decision'}:
-        raise ValueError('Expected exactly one subgoal planning decision')
+        raise PlanningFormatError('Expected exactly one goal-board decision', payload)
     validate_planning_decision(payload['decision'], request)
     return payload['decision']
 
 
+def select_evidence_frames(frames, limit=MAX_EVIDENCE_FRAMES):
+    # Include the earliest and latest actual execution endpoints, sampling across
+    # the entire review interval rather than truncating to its last seconds.
+    unique = {f['observation_id']: f for f in frames}
+    ordered = sorted(unique.values(), key=lambda f: f['step_id'])
+    if len(ordered) <= limit: return deepcopy(ordered)
+    indices = [round(i*(len(ordered)-1)/(limit-1)) for i in range(limit)]
+    return [deepcopy(ordered[i]) for i in indices]
+
+
 def planning_packet(request):
-    """Attach references and recent endpoints; no proposal, reward or hidden state."""
     if request.get('version') != PLAN_VERSION:
-        raise ValueError('Expected the version-4 subgoal planning protocol')
-    frames = [*request.get('reference_frames', []), *request.get('evidence_frames', [])[-2:], request['current_scene']]
+        raise ValueError('Expected the version-5 goal-board protocol')
+    frames = [*request.get('reference_frames', []), *select_evidence_frames(request.get('evidence_frames', [])), request['current_scene']]
     seen, images, scenes = set(), [], []
     for frame in frames:
-        if frame['observation_id'] in seen:
-            continue
+        if frame['observation_id'] in seen: continue
         seen.add(frame['observation_id'])
-        scene = visual_frame(frame)
-        scene.pop('images')
+        scene = visual_frame(frame); scene.pop('images')
         scene['image_indices'] = []
         for im in frame['images']:
             scene['image_indices'].append(dict(index=len(images), camera=im['camera']))
@@ -207,9 +303,11 @@ def planning_packet(request):
     fields = ('version', 'planner_role', 'review_kind', 'original_task', 'task_context',
               'remaining_requirements', 'completed_requirements', 'remaining_plan', 'current_subgoal',
               'review_reason', 'monitor_evidence', 'all_requirements', 'previous_assessments', 'execution_budget',
-              'instruction_history')
+              'instruction_history', 'goal_board', 'format_repair', 'evidence_coverage')
     packet = {key: deepcopy(request[key]) for key in fields if key in request}
     packet['pi_instruction_contract'] = deepcopy(PI_INSTRUCTION_CONTRACT)
+    packet['dispatch_policy'] = deepcopy(DISPATCH_POLICY)
+    packet['instruction_options'] = {r['requirement_id']: instruction_options(r) for r in request['all_requirements']}
     packet['scenes'] = scenes
     return packet, images
 

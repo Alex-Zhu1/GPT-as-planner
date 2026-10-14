@@ -7,8 +7,7 @@ No dependency on the sibling `Jev` checkout is needed.
 
 ## Subgoal policy (default)
 
-`jev.run` defaults to `--monitor-policy subgoals`. Astra produces **one to
-three language stages**, Pi executes the active instruction, and Valen detects
+`jev.run` defaults to `--monitor-policy subgoals`. Astra maintains a **structured goal board**, Pi executes the active instruction, and Valen detects
 anomalies. **Only Astra assesses completion and authorizes stage transitions.**
 The previous background recovery experiment requires `--monitor-policy temporal`.
 
@@ -44,40 +43,66 @@ audit. These public semantics contain no per-episode success or object truth.
 Other known task templates preserve their required order; unknown instructions
 remain whole. Placement requirements in this scene may be reordered.
 
-The shared [subgoal_planner.md](subgoal_planner.md) uses a **version-4** schema in
-both API and compact transports. Astra returns `plan` (1–3 replacement goals),
+The shared [subgoal_planner.md](subgoal_planner.md) uses a **version-5** schema in
+both API and compact transports. Astra returns `plan` (one atomic card per unfinished requirement),
 `keep_plan`, or `advance`. Every review assesses **all** requirements as satisfied,
 pending, or uncertain, with visual evidence. A replacement plan covers exactly
 the unfinished, uncertain, or reopened requirements, each once. Coverage, checks,
-ordering constraints and request identity are validated. Astra can write concise
-RoboDojo-style repair instructions instead of copying original clauses verbatim.
+ordering constraints and request identity are validated. Astra chooses a short instruction from each card’s public `instruction_options`.
+IDs and checks stay fixed when wording changes.
 It can recognize work done outside the current stage and reopen damaged results;
 Valen cannot mark requirements complete or reopen them. Arm return remains last.
-External `--planner-url` services must implement this version-4 envelope.
+External `--planner-url` services must implement this version-5 envelope.
 The older full-agent skill is not loaded; the model remains `gpt-6-astra/high`.
 No performance gain is assumed without evaluation.
 
 Pi instructions use short action/target/destination descriptions, for example
 `Pick up the fallen figurine and put it upright on the stand.` The host validates
-at most **24 words, 160 characters and one sentence per covered requirement**
-(600 characters total for grouped stages), and rejects common verification or
-preservation appendices such as `ensure ...` or `without disturbing ...`.
-These bounds are a language-interface policy, not an experimentally optimal
-token limit. Stability, support, release and preservation requirements remain
-in the exact completion checks and Astra's visual assessments. Necessary release
-actions are still allowed. Invalid text is rejected before activation, never
-silently truncated; a rejected planner response stops the scheduler as before.
+**24 words, 160 characters and one sentence total**, independently of coverage,
+and exact membership in the card's `instruction_options`. Grouped goals and
+appended clauses are rejected, including paraphrases without known keywords.
+These bounds are an interface policy, not an experimentally optimal token limit.
+Stability, support and preservation remain in immutable completion checks and
+visual assessments. Known recovery options are reviewed public language choices,
+not a guarantee that Pi can perform the requested recovery. Unknown tasks retain
+their source instruction as their sole option if it meets the same bounds;
+unsupported long source instructions stop before execution and need a curated
+atomic task contract, rather than silent truncation.
 
-Every review includes the last six activated instruction versions, their covered
-requirements, actual executed control counts and the reasons for changing them.
-When fresh execution evidence shows repeated failed grasps or ineffective
-attempts, Astra should return `plan` with a different short description of the
-same unfinished goal, preserving completion checks and future work. A periodic
-review may do this even when Valen found no anomaly. Normal approach, occlusion
-or elapsed time alone do not justify a rewrite. The existing review cooldown and
-planner-call budget still apply; no automatic synonym cycling is introduced.
-`subgoal_instruction_rewritten` records old/new wording and Astra's reason;
-`instruction_history` in the summary retains execution counts across `keep_plan`.
+`goal_board.json` and the final summary preserve every original requirement,
+including completed cards, with status, execution feedback, active instruction,
+control counts and per-card attempts/reviews. `satisfied` requires `complete`;
+other feedback is `not_attempted`, `progressing`, `ineffective`, or `uncertain`.
+Every accepted review removes all satisfied cards from the execution queue,
+including cards completed outside the current stage. Reopening requires a plan.
+The board is not a fixed serial queue. `plan` selects its first card for execution
+and may defer an unfinished independent goal; the remaining order is tentative.
+After Astra confirms the active attempt ineffective, dispatch policy v1 requires
+yielding to an unserved independent goal, or otherwise the least recently served
+alternative. Astra chooses among ties; the host rejects invalid selections at
+the same paused scene. Source-order prerequisites and final arm return still apply.
+If no alternative is eligible, the current goal may retry with different wording.
+Deferred cards retain status and history, and may retain their queued wording;
+on resumption, a last ineffective executed instruction requires a different option
+when available. Incidental manipulation does not invalidate an untried instruction.
+Normal approach, occlusion and elapsed time alone do not prove failure.
+Board cards expose `last_executed_step`, `waiting_controls` and `deferred` alongside
+actual Pi control counts. `subgoal_deferred`/`subgoal_resumed` audit target switches;
+`subgoal_instruction_rewritten` records old/new wording even across deferral.
+
+Astra receives up to **eight endpoints spanning the entire review interval**,
+its first and last endpoints included, plus labeled initial/goal/completion
+references and a fresh paused capture. `evidence_coverage` records the full
+endpoint count and selected steps. This is sparse evidence, not continuous video.
+Valen's six recent endpoints remain independent of this longer evidence window.
+
+Malformed model JSON or an invalid decision triggers at most **two correction
+calls at the same paused physical state**, each with a new request ID and explicit
+validation feedback. No invalid decision changes the board or reaches Pi.
+Every call counts against `max-replans`; rejected answers and lineage are logged.
+Identity mismatch, unavailable models, transport errors and timeouts stop
+incomplete without correction retries. Exhausted correction/global budgets also
+stop incomplete. The two transports share this scheduler-owned policy.
 
 Valen receives plan context, task requirements, recent three-camera endpoints
 and labeled reference images. Its only questions are:
@@ -106,12 +131,14 @@ Scheduling defaults (experimental thresholds, not calibrated probabilities):
 - Every 12 simulated seconds since the last review, Astra checks progress even
   without an anomaly (`--subgoal-review-seconds`). This allows completion and
   stage switching without making Valen a completion judge. A 40-second episode
-  with no anomalies uses four Astra calls including the initial plan.
+  with no anomalies or format corrections uses four Astra calls including the
+  initial plan. Atomic goals may need more frequent reviews to finish within a
+  short native horizon; this default is not a guarantee of sufficient transitions.
 - A final visual confirmation retains the last instruction for settling until
   native termination. Later visual assessments can revoke it. Only native
   success counts as task success.
 - `--max-replans 12` includes the initial call; zero removes this cap.
-  Exhausted budgets, malformed plans or unavailable models stop incomplete.
+  Exhausted budgets, uncorrected invalid plans or unavailable models stop incomplete.
   `--max-decisions 0` uses native termination. Older action-tuning flags require
   an explicit older monitor policy.
 

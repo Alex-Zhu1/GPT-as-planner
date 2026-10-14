@@ -149,7 +149,7 @@ def main(argv=None):
     write_json(output/'planner_backend.json', dict(backend=selected_backend,
         api_base_url=planner.base_url if selected_backend == 'api' else None,
         planner_url=args.planner_url, monitor_policy=args.monitor_policy,
-        protocol_version=4 if subgoals else None,
+        protocol_version=5 if subgoals else None,
         options={} if subgoals or selected_backend == 'http' else planner_options))
     student = rollout = None
     try:

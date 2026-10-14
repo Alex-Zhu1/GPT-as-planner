@@ -133,7 +133,7 @@ class ResponsesClient:
         pass
 
 
-def structured_payload(response, model='gpt-6-astra'):
+def structured_payload(response, model='gpt-6-astra', *, require_object=True):
     if not isinstance(response, dict) or response.get('model') != model:
         raise ValueError(f'Model API returned a different model than {model}')
     if response.get('status') != 'completed':
@@ -149,6 +149,6 @@ def structured_payload(response, model='gpt-6-astra'):
                 raise ValueError('Model API refused or returned non-text output')
             texts.append(part['text'])
     payload = json.loads(''.join(texts))
-    if not isinstance(payload, dict):
+    if require_object and not isinstance(payload, dict):
         raise ValueError('Model API output must be a JSON object')
     return payload
